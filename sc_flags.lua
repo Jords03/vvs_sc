@@ -264,8 +264,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             enterPits = true
             onTrack = false
             goGreen = false
-            --getCarLapCounts = true
-            checkGoGreen = true
+            getCarLapCounts = true
+            --checkGoGreen = true
             timeToDisplayTextAccumulator = timeAccumulator
         elseif message == "SC: Safety Car has reset in pits" then
             writeLog("SC: Recieved - Safety Car has reset in pits")
