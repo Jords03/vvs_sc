@@ -155,7 +155,7 @@ local function logAudioCallback(err, folder)
     
     scDeployedAudio = folder .. "/safety_car.wav"
     scInThisLapAudio = folder .. "/safety_car_this_lap.wav"
-    scGoGreenAudio = folder .. "/safety_car_this_lap.wav"    
+    scGoGreenAudio = folder .. "/safety_car_this_lap.wav"
 
     scDeployedAudio = {
         --filename = 'extension/lua/online/AC_RP_SafetyCar/safety_car.wav',
@@ -329,26 +329,11 @@ local function getLeaderboard()
     
 end
 
+--[[  FIX THIS
 ac.onTrackPointCrossed(-1, 0, function(carIndex, timeMs)
     leaderboardHasCrossedSF[carIndex] = true
-    if checkGoGreen and carIndex ~= safetyCarID then
-        writeLog("SC: Car ID: " .. carIndex .. " crossed start finish")
-        writeLog("SC: Leader Go Green")
-        flagColor = rgbm(0,225,0,1)
-        scHeadingTextColor = rgbm(0,225,0,1)
-        scHeadingText = scHeadingTextState.green
-        scStatusText = scState.off
-        scLeaderText = scLeaderTextState.off
-
-        showFlags = true
-        goGreen = true
-      
-        audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-
-        checkGoGreen = false
-        timeToDisplayGreenAccumulator = timeAccumulator
-    end
 end)
+]]
 
 -- Function to detect erratic driving behavior and check distance
 local function detectErraticAndPos(dt)
@@ -385,33 +370,24 @@ local function detectErraticAndPos(dt)
             passSafetyCar = true
         end
 
-        -- Determine catch-up conditions based on distance behind the safety car
-        if passSafetyCar then
-            catchPack = true
-        elseif distanceInMeters > (distanceThreshold * 3) then
-            catchPack = true
-        elseif distanceInMeters > distanceThreshold then
-            tooFar = true
-        else
-            -- Determine if another car is ahead and calculate the distance to it
-            local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
-            for i, otherCar in ac.iterateCars.ordered() do
-                if otherCar ~= safetyCar and otherCar ~= car then
-                    local distanceAhead = calculateDistanceBehind(car.splinePosition, otherCar.splinePosition)
-                    if distanceAhead > 0 and distanceAhead < minDistanceAhead then
-                        minDistanceAhead = distanceAhead
-                        carAhead = otherCar
-                    end
+        -- Determine if another car is ahead and calculate the distance to it
+        local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
+        for i, otherCar in ac.iterateCars.ordered() do
+            if otherCar ~= safetyCar and otherCar ~= car then
+                local distanceAhead = calculateDistanceBehind(car.splinePosition, otherCar.splinePosition)
+                if distanceAhead > 0 and distanceAhead < minDistanceAhead then
+                    minDistanceAhead = distanceAhead
+                    carAhead = otherCar
                 end
             end
+        end
 
-            -- Calculate the distance and determine if the driver is too far
-            if carAhead then
-                carDistance = minDistanceAhead * trackLength
-                tooFar = carDistance > distanceThreshold
-                if carDistance > (distanceThreshold * 3) then
-                    catchPack = true
-                end
+        -- Calculate the distance and determine if the driver is too far
+        if carAhead then
+            carDistance = minDistanceAhead * trackLength
+            tooFar = carDistance > distanceThreshold
+            if carDistance > (distanceThreshold * 3) then
+                catchPack = true
             end
         end
         
@@ -482,7 +458,6 @@ local function detectErraticAndPos(dt)
         }
     end
 end
-
 
 
 local function textSize(text_size, fontsize)
@@ -602,7 +577,6 @@ function script.update(dt)
             end
         end
 
-        --[[
         if getCarLapCounts then        
             local maxSplinePosition = -1
 
@@ -627,9 +601,7 @@ function script.update(dt)
             checkGoGreen = true
             getCarLapCounts = false
         end
-        ]]
 
-        --[[
         if checkGoGreen then
             for i, car in ac.iterateCars.ordered() do
                 if car == safetyCarID or car.isInPitlane or car.isInPit then
@@ -654,7 +626,6 @@ function script.update(dt)
                 end
             end
         end
-        ]]
     end
 end
 
