@@ -155,7 +155,7 @@ local function logAudioCallback(err, folder)
     
     scDeployedAudio = folder .. "/safety_car.wav"
     scInThisLapAudio = folder .. "/safety_car_this_lap.wav"
-    scGoGreenAudio = folder .. "/safety_car_this_lap.wav"
+    scGoGreenAudio = folder .. "/safety_car_green_flag.wav"
 
     scDeployedAudio = {
         --filename = 'extension/lua/online/AC_RP_SafetyCar/safety_car.wav',
