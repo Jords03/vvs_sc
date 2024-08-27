@@ -58,8 +58,8 @@ local SC_CALLIN_THRESHOLD_END = 0.75
 
 -- Leaderboard
 local carLeaderboard = {}
-local leaderboardPrevDistances = {}
-local leaderboardHasCrossedSF = {}
+local prevDistances = {}
+local hasCrossedSF = {}
 
 -- Base state variables
 local scInPitLane = false
@@ -197,11 +197,12 @@ local function initializeSCScript()
     end
 
     if ac.tryToTeleportToPits() then
-        ac.tryToStart()
-        scInPitLane = true
-    else
-        writeLog("SC: Teleportation to pits failed. Retrying...")
-        waitingToStart = true
+        if ac.tryToStart() then
+            scInPitLane = true
+        else
+            writeLog("SC: Teleportation to pits & start failed. Retrying...")
+            waitingToStart = true
+        end
     end
 
     -- Set track length dependent thresholds
@@ -283,6 +284,35 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     return processChatMessage(message, senderCarIndex)
 end)
 
+local function checkSFCrossing()
+    --for efficiency, once all cars are crossed then don't run this
+    if allCarsCrossed then return end
+    --on the heartbeat
+    if timeAccumulator - sfCheckTime  >= sfCheckHeartBeat then
+        local anyFalse = false
+
+        --iterate the list of cars
+        for i, car in ac.iterateCars.ordered() do
+            --first go we will have no stored splines
+            if prevSplines[car.index] == nil then
+                prevSplines[car.index] = car.splinePosition
+            else
+                --spline has gone from 0.9x to 0.0x
+                if prevSplines[car.index] > 0.9 and car.splinePosition < 0.1 then
+                    hasCrossedSF[car.index] = true
+                end
+            end
+            --check if any are false still
+            if hasCrossedSF[car.index] == nil then
+                anyFalse = true
+            end
+        end
+        --all cars have passed the check, disable it
+        if not anyFalse then allCarsCrossed = true end
+        sfCheckTime = timeAccumulator
+    end
+end
+
 local function getLeaderboard()
     --ac.log("get leaderboard")
     local carPosList = {}
@@ -294,15 +324,15 @@ local function getLeaderboard()
         --get distance
         local distanceDriven = (car.splinePosition * trackLength) + (car.lapCount * trackLength)
         
-        if leaderboardPrevDistances[car.index] == nil then
-            leaderboardPrevDistances[car.index] = trackLength * -2
+        if prevDistances[car.index] == nil then
+            prevDistances[car.index] = trackLength * -2
         end
 
         --deal with cars that haven't crossed the SF yet - given them a negative distance driven that approaches 0 as they get to the line
         --only applies to cars with lap count of 0
         if car.lapCount == 0 then
             --for cars that haven't yet crossed the start finish
-            if leaderboardHasCrossedSF[car.index] == nil then
+            if hasCrossedSF[car.index] == nil then
                 --sanity check that the spline is over 0.1 so we don't accidentally pick up someone that has just crossed the line
                 if car.splinePosition > 0.1 then
                     distanceDriven = (1 - car.splinePosition) * trackLength * -1
@@ -310,14 +340,14 @@ local function getLeaderboard()
             end
         end
 
-        --writeLog(car.splinePosition .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. leaderboardPrevDistances[car.index] )
+        --writeLog(car.splinePosition .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. prevDistances[car.index] )
 
         -- sanity check - if it's less than the previous distance then discard and go with previous measurement
-        if distanceDriven >= leaderboardPrevDistances[car.index] then
-            leaderboardPrevDistances[car.index] = distanceDriven
+        if distanceDriven >= prevDistances[car.index] then
+            prevDistances[car.index] = distanceDriven
         else
-            writeLog("SANITY CHECK FAILED! " .. car:driverName() .. car.splinePosition .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. leaderboardPrevDistances[car.index] )
-            distanceDriven = leaderboardPrevDistances[car.index]
+            writeLog("SANITY CHECK FAILED! " .. car:driverName() .. car.splinePosition .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. prevDistances[car.index] )
+            distanceDriven = prevDistances[car.index]
         end
 
         carPosList[#carPosList + 1] = {car=car, distanceDriven=distanceDriven}
@@ -508,14 +538,15 @@ end
 
 function script.update(dt)
 
-    ac.debug("SC: In pitlane", safetyCar.isInPitlane)
-    ac.debug("SC: In pitbox", safetyCar.isInPit)
-
     -- Total time passed - used for controlling delayed stuff
     timeAccumulator = timeAccumulator + dt
     ac.debug("SC: timeAccumulator", timeAccumulator)
+    ac.debug("SC: In pitlane", safetyCar.isInPitlane)
+    ac.debug("SC: In pitbox", safetyCar.isInPit)    
 
     if not ensureSimAndSafetyCar() then return false end
+
+    checkSFCrossing()
 
     -- Session start sanity checks - if we are in a wait state and we have gone more than 1 second then reissue the command and reset the 1s timer
     if waitingToStart then
@@ -528,6 +559,14 @@ function script.update(dt)
                 end
             end
             waitingToStartTimerOn = timeAccumulator
+        end
+    end
+
+    if safetyCar.justJumped then
+        if ac.tryToStart() then
+            waitingToStart = false
+            scInPitLane = true
+            writeLog("SC: Start successful after jump/reset")
         end
     end
 
@@ -643,9 +682,9 @@ function script.update(dt)
             if scEnteringPitlane then
                 scOnTrack = false
                 ac.sendChatMessage("SC: Safety Car is entering pit lane")
-                writeLog("SC: Safety Car is entering pit lane")   
+                writeLog("SC: Safety Car is entering pit lane")
                 checkLeaderPos = true
-                local carLeaderboard = getLeaderboard()
+                carLeaderboard = getLeaderboard()
                 raceLeader = carLeaderboard[1].car
                 underSCLapCount = raceLeader.lapCount
                 writeLog("SC: Leader Lap Count" .. underSCLapCount)
