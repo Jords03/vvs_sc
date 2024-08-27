@@ -476,16 +476,16 @@ local function getLeadingCarBehindSC()
     local leadingCarNotInPit = nil
     local distanceMeters = nil
     
-    local carLeaderboard = getLeaderboard()
+    carLeaderboard = getLeaderboard()
     local sessionLeader = carLeaderboard[1].car
 
-    --ac.debug("SC: SessionState Leader", sessionLeader:driverName())
+    ac.debug("SC: SessionState Leader", sessionLeader:driverName())
 
-    for i, entry in ipairs(carLeaderboard) do
-        local car = entry.car
-        if not (car.isInPit or car.isInPitlane) or car ~= safteyCar then
+    for i = 1, #carLeaderboard, 1 do
+        local car = carLeaderboard[i].car
+        if not (car.isInPit or car.isInPitlane or car == safteyCar) then
             leadingCarNotInPit = car
-            --ac.debug("SC: Leading Car Behind SC: ", car:driverName())
+            ac.debug("SC: Leading Car Behind SC: ", car:driverName())
             break
         end
     end
