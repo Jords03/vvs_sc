@@ -262,7 +262,7 @@ local function processChatMessage(message, senderCarIndex)
     if senderCarIndex == safetyCar.index or senderCarIndex == adminCar.index then
         if message == "SC scon" then
             callSafetyCar()
-            writeLog("SC: SC scon recieved")
+            writeLog("SC: SC scon recieved | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
         elseif message == "SC scoff" then
             scManualCallin = true
             scConditonsMet = true
