@@ -434,6 +434,12 @@ local function getLeaderboard()
     
 end
 
+-- Calculate the normalized distance behind the safety car
+local function calculateDistanceBehind(carPosition, scPosition)
+    local distance = (scPosition - carPosition) % 1
+    return distance  -- Always a value between 0 and 1
+end
+
 -- Function to detect erratic driving behavior and check distance
 local function detectErraticAndPos(dt)
     local car = driverCar
@@ -454,12 +460,6 @@ local function detectErraticAndPos(dt)
 
         -- Check if driverCar is the race leader
         local isRaceLeader = (car == raceLeaderPos)
-
-        -- Calculate the normalized distance behind the safety car
-        local function calculateDistanceBehind(carPosition, scPosition)
-            local distance = (scPosition - carPosition) % 1
-            return distance  -- Always a value between 0 and 1
-        end
 
         -- Calculate the distance behind the safety car
         local distanceBehindSC = calculateDistanceBehind(car.splinePosition, safetyCar.splinePosition)

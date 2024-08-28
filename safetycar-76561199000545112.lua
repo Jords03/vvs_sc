@@ -29,7 +29,7 @@ local carPitEntryTimes = {}
 local retiredCars = {}
 local previousGapToSC = {}
 local carsNotGainingOnSC = {}
-local gainingTimeThreshold = 3
+local gainingTimeThreshold = 2
 
 -- Time accumulators
 local timeHalfSec = 0.5 -- seconds
@@ -41,8 +41,6 @@ local timeMedium = 5
 local timeMediumAccumulator = 0
 local timeLong = 10
 local timeLongAccumulator = 0
-local sfCheckHeartBeat = 1
-local sfCheckTime = 0
 
 -- Session start variables
 local waitingToStartTimerOn = 0
@@ -58,10 +56,14 @@ local scDisableWithLapsToGo = 2
 local SC_CALLIN_THRESHOLD_START = 0.5
 local SC_CALLIN_THRESHOLD_END = 0.75
 
--- Leaderboard
+-- Leaderboard variables
 local carLeaderboard = {}
 local prevDistances = {}
 local hasCrossedSF = {}
+local prevSplines = {}
+local sfCheckHeartBeat = 1
+local sfCheckTime = 0
+local allCarsCrossed = false
 
 -- Base state variables
 local scInPitLane = false
@@ -102,7 +104,7 @@ function initializeSSStates()
     retiredCars = {}
     previousGapToSC = {}
     carsNotGainingOnSC = {}
-    gainingTimeThreshold = 3
+    gainingTimeThreshold = 2
 
     -- Time accumulators
     timeHalfSec = 0.5 -- seconds
@@ -114,8 +116,6 @@ function initializeSSStates()
     timeMediumAccumulator = 0
     timeLong = 10
     timeLongAccumulator = 0
-    sfCheckHeartBeat = 1
-    sfCheckTime = 0
 
     -- Session start variables
     waitingToStartTimerOn = 0
@@ -130,6 +130,15 @@ function initializeSSStates()
     scDisableWithLapsToGo = 2
     SC_CALLIN_THRESHOLD_START = 0.5
     SC_CALLIN_THRESHOLD_END = 0.75
+
+    -- Leaderboard variables
+    carLeaderboard = {}
+    prevDistances = {}
+    hasCrossedSF = {}
+    prevSplines = {}
+    sfCheckHeartBeat = 1
+    sfCheckTime = 0
+    allCarsCrossed = false
 
     -- Base state variables
     scInPitLane = false
@@ -360,8 +369,13 @@ local function getLeaderboard()
     --[[for pos=1, #carPosList, 1 do
         writeLog(carPosList[pos].car:driverName() .. " - in position " .. pos ..  " - distanceDriven " .. carPosList[pos].distanceDriven .. " - lap count " .. carPosList[pos].car.lapCount)
     end]]
-    return carPosList
-    
+    return carPosList 
+end
+
+-- Calculate the normalized distance behind the safety car
+local function calculateDistanceBehind(carPosition, car2Position)
+    local distance = (car2Position - carPosition) % 1
+    return distance  -- Always a value between 0 and 1
 end
 
 -- Update car statuses and gaps to SC
@@ -384,13 +398,9 @@ local function updateCarStatuses()
                 carPitEntryTimes[car.index] = nil
                 retiredCars[car.index] = nil
 
-                -- Update cars gaps to SC
+                -- Update car's gaps to SC
                 local carSplinePos = car.splinePosition
-                local distanceToSC = carSplinePos - scSplinePos
-                if distanceToSC < 0 then
-                    distanceToSC = 1 + distanceToSC
-                end
-
+                local distanceToSC = calculateDistanceBehind(carSplinePos, scSplinePos)
                 local secondsAhead = distanceToSC * trackLength / safetyCar.speedMs
                 local previousSecondsAhead = previousGapToSC[car.index] or secondsAhead
                 local isGaining = secondsAhead < previousSecondsAhead
@@ -399,6 +409,7 @@ local function updateCarStatuses()
                 
                 if not isGaining and secondsAhead > gainingTimeThreshold then
                     carsNotGainingOnSC[car.index] = {notGaining = true, secondsAhead = secondsAhead}
+                    writeLog("SC: CarStatus: " .. car:driverName() .. " is not gaining on SC | Gap is " .. secondsAhead .. " seconds")
                 else
                     carsNotGainingOnSC[car.index] = nil
                 end
@@ -412,22 +423,10 @@ local function updateCarStatuses()
     end
 end
 
-
--- Check if a car is within threshold of the Safety Car
-local function isNearSC(carPosition, safetyCarPosition, distanceThreshold)
-    local distance = safetyCarPosition - carPosition
-        if distance < 0 then
-            distance = 1 + distance
-        end
-    local distanceMeters = distance * trackLength
-
-    return distanceMeters <= distanceThreshold
-end
-
 -- Check if the Safety Car can come in based on the number of cars and their positions
 local function canSafetyCarComeIn()
     if not ensureSimAndSafetyCar() then return false end
-    
+
     updateCarStatuses()
 
     local connectedCars = sim.connectedCars
@@ -449,10 +448,12 @@ local function canSafetyCarComeIn()
             break
         end
 
-        if not (retiredCars[car.index]) and car ~= safetyCar then
+        if not (retiredCars[car.index] or car ~= safetyCar) then
             -- We don't add cars still active but in pits less than pit time limit
             if not (car.isInPitlane or car.isInPit) then
-                if car and isNearSC(car.splinePosition, safetyCar.splinePosition, distanceThresholdMeters) then
+                local distanceToSC = calculateDistanceBehind(car.splinePosition, safetyCar.splinePosition)
+                local distanceMeters = distanceToSC * trackLength
+                if car and distanceMeters < distanceThresholdMeters then
                     carsNearAndBehindSC = carsNearAndBehindSC + 1
                 end
             end
@@ -527,13 +528,10 @@ local function getLeadingCarBehindSC()
     if leadingCarNotInPit then
         local scSplinePos = safetyCar.splinePosition
         local carSplinePos = leadingCarNotInPit.splinePosition
-        local distance = scSplinePos - carSplinePos
+        local distance = calculateDistanceBehind(carSplinePos, scSplinePos)
 
-        if distance < 0 then
-            distance = 1 + distance
-        end
         distanceMeters = distance * trackLength
-        --ac.debug("SC: Leading car distance to SC:", distanceMeters)
+        ac.debug("SC: LC distance to SC:", distanceMeters)
         ac.debug("SC: scSplinePos:", scSplinePos)
     end
 
