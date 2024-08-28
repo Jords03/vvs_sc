@@ -450,16 +450,20 @@ local function detectErraticAndPos(dt)
         local tooFar = false
         local catchPack = false
         local passSafetyCar = false
+        local raceLeaderPos = nil
+        local isRaceLeader = false
 
         -- Determine the race leader
         if timeAccumulator - leaderCheckTime >= shortCheckInterval then
             carLeaderboard = getLeaderboard()
+            raceLeaderPos = carLeaderboard[1].car
             leaderCheckTime = timeAccumulator
         end
-        local raceLeaderPos = carLeaderboard[1].car
 
         -- Check if driverCar is the race leader
-        local isRaceLeader = (car == raceLeaderPos)
+        if raceLeaderPos then
+            isRaceLeader = (car == raceLeaderPos)
+        end
 
         -- Calculate the distance behind the safety car
         local distanceBehindSC = calculateDistanceBehind(car.splinePosition, safetyCar.splinePosition)
@@ -656,9 +660,11 @@ function script.update(dt)
     if showFlags then
 
         if onTrack then
-            if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then        
-                if not (driverCar == carLeaderboard[1].car and driverCar.splinePosition > 0.8) then
-                    detectErraticAndPos(dt)
+            if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
+                if carLeaderboard[1] then
+                    if not (driverCar == carLeaderboard[1].car and driverCar.splinePosition > 0.8) then
+                        detectErraticAndPos(dt)
+                    end
                 end
                 erraticCheckAccumulator = timeAccumulator
             end
