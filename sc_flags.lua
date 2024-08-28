@@ -617,13 +617,14 @@ local function uiFlags(dt)
         ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
         
         if driverCar ~= safetyCar then
-            if driverCar == carLeaderboard[1].car then
-                ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
-                scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
-            end 
+            if carLeaderboard[1] then
+                if driverCar == carLeaderboard[1].car then
+                    ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
+                    scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
+                end
+            end
             ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
         end
-
         ui.endTransparentWindow()
 
     end
@@ -632,7 +633,6 @@ end
 function script.drawUI()
     uiFlags()
 end
-
 
 function script.update(dt)
 
@@ -654,7 +654,7 @@ function script.update(dt)
     ]]
 
     if showFlags then
-        
+
         if onTrack then
             if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then        
                 if not (driverCar == carLeaderboard[1].car and driverCar.splinePosition > 0.8) then
@@ -695,7 +695,7 @@ function script.update(dt)
                     carLapCounts[car.index] = 9999
                 else
                     carLapCounts[car.index] = car.lapCount or 0
-                    
+                   
                     if car.splinePosition > maxSplinePosition then
                         maxSplinePosition = car.splinePosition
                         raceLeader = car
