@@ -210,12 +210,11 @@ local function initializeSCScript()
     end
 
     if ac.tryToTeleportToPits() then
-        if ac.tryToStart() then
-            scInPitLane = true
-        else
-            writeLog("SC: Teleportation to pits & start failed. Retrying...")
-            waitingToStart = true
-        end
+        ac.tryToStart()
+        scInPitLane = true
+    else
+        writeLog("SC: Teleportation to pits & start failed. Retrying...")
+        waitingToStart = true
     end
 
     -- Set track length dependent thresholds
@@ -558,21 +557,12 @@ function script.update(dt)
     if waitingToStart then
         if timeAccumulator - waitingToStartTimerOn >= 1 then
             if ac.tryToTeleportToPits() then
-                if ac.tryToStart() then
-                    waitingToStart = false
-                    scInPitLane = true
-                    writeLog("SC: Teleportation to pit and start successful")
-                end
+                ac.tryToStart()
+                waitingToStart = false
+                scInPitLane = true
+                writeLog("SC: Teleportation to pit and start successful")
             end
             waitingToStartTimerOn = timeAccumulator
-        end
-    end
-
-    if safetyCar.justJumped then
-        if ac.tryToStart() then
-            waitingToStart = false
-            scInPitLane = true
-            writeLog("SC: Start successful after jump/reset")
         end
     end
 
@@ -704,7 +694,9 @@ function script.update(dt)
     if scHeadingToPit and safetyCar.isInPit then
         -- Reset SC once entering pit box
         physics.setCarAutopilot(false, false)
-        ac.tryToTeleportToPits()
+        if ac.tryToTeleportToPits() then
+            ac.tryToStart()
+        end
         scHeadingToPit = false
         scRequested = false
         scOnTrack = false
