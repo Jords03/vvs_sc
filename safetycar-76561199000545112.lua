@@ -330,7 +330,7 @@ local function getLeaderboard()
     --ac.log("get leaderboard")
     local carPosList = {}
     for i, car in ac.iterateCars.ordered() do
-        if car == safetyCar then
+        if car == safteyCar or car.isInPit or car.isInPitlane then
             break
         end
 
@@ -369,7 +369,7 @@ local function getLeaderboard()
     --[[for pos=1, #carPosList, 1 do
         writeLog(carPosList[pos].car:driverName() .. " - in position " .. pos ..  " - distanceDriven " .. carPosList[pos].distanceDriven .. " - lap count " .. carPosList[pos].car.lapCount)
     end]]
-    return carPosList 
+    return carPosList
 end
 
 -- Calculate the normalized distance behind the safety car
@@ -510,29 +510,32 @@ end
 local function getLeadingCarBehindSC()
     local leadingCarNotInPit = nil
     local distanceMeters = nil
+    local sessionLeader = nil
     
     carLeaderboard = getLeaderboard()
-    local sessionLeader = carLeaderboard[1].car
+    if carLeaderboard[1] then 
+        sessionLeader = carLeaderboard[1].car
 
-    ac.debug("SC: SessionState Leader", sessionLeader:driverName())
+        ac.debug("SC: SessionState Leader", sessionLeader:driverName())
 
-    for i = 1, #carLeaderboard, 1 do
-        local car = carLeaderboard[i].car
-        if not (car.isInPit or car.isInPitlane or car == safteyCar) then
-            leadingCarNotInPit = car
-            ac.debug("SC: Leading Car Behind SC: ", car:driverName())
-            break
+        for i = 1, #carLeaderboard, 1 do
+            local car = carLeaderboard[i].car
+            if not (car.isInPit or car.isInPitlane or car == safteyCar) then
+                leadingCarNotInPit = car
+                ac.debug("SC: Leading Car Behind SC: ", car:driverName())
+                break
+            end
         end
-    end
 
-    if leadingCarNotInPit then
-        local scSplinePos = safetyCar.splinePosition
-        local carSplinePos = leadingCarNotInPit.splinePosition
-        local distance = calculateDistanceBehind(carSplinePos, scSplinePos)
+        if leadingCarNotInPit then
+            local scSplinePos = safetyCar.splinePosition
+            local carSplinePos = leadingCarNotInPit.splinePosition
+            local distance = calculateDistanceBehind(carSplinePos, scSplinePos)
 
-        distanceMeters = distance * trackLength
-        ac.debug("SC: LC distance to SC:", distanceMeters)
-        ac.debug("SC: scSplinePos:", scSplinePos)
+            distanceMeters = distance * trackLength
+            ac.debug("SC: LC distance to SC:", distanceMeters)
+            ac.debug("SC: scSplinePos:", scSplinePos)
+        end
     end
 
     return leadingCarNotInPit, distanceMeters
