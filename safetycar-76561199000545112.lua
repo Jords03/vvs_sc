@@ -41,6 +41,8 @@ local timeMedium = 5
 local timeMediumAccumulator = 0
 local timeLong = 10
 local timeLongAccumulator = 0
+local sfCheckHeartBeat = 1
+local sfCheckTime = 0
 
 -- Session start variables
 local waitingToStartTimerOn = 0
@@ -112,6 +114,8 @@ function initializeSSStates()
     timeMediumAccumulator = 0
     timeLong = 10
     timeLongAccumulator = 0
+    sfCheckHeartBeat = 1
+    sfCheckTime = 0
 
     -- Session start variables
     waitingToStartTimerOn = 0
