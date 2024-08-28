@@ -286,6 +286,7 @@ local function processChatMessage(message, senderCarIndex)
             setSCLights("off")
             writeLog("SC: Safety Car is manually called in")
         elseif message == "SC: Kill Switch" then
+            initializeSSStates()
             initializeSCScript()
         end
     end
@@ -629,7 +630,9 @@ function script.update(dt)
     -- Things we do every 5 (medium) seconds
     if timeAccumulator - timeMediumAccumulator >= timeMedium then
         -- Checks for retired cars and stragglers
-        updateCarStatuses()
+        if allCarsCrossed then
+            updateCarStatuses()
+        end
 
         if scManualCallin then
             ac.sendChatMessage("SC: Safety Car is heading to pits")
@@ -733,8 +736,5 @@ ac.onSessionStart(function(sessionIndex, restarted)
     initializeSCScript()
     writeLog("SC: Safety Car Script Initialized on Session Start")
 end)
-
-ac.onRelease(initializeSCScript)
-ac.onRelease(initializeSSStates)
 
 initializeSCScript()
