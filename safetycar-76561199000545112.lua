@@ -6,173 +6,100 @@ SCRIPT_VERSION_CODE = 00001
 
 -- Get states
 local sim = ac.getSim()
-local safetyCarID = ac.getCarByDriverName("Safety Car")
-local safetyCar = ac.getCar(safetyCarID)
 local currentSession = ac.getSession(sim.currentSessionIndex)
+local safetyCarName = "Safety Car"
 local adminName = "Jon Astrop"
-local adminCar = nil
 
--- Load support scripts | Do we want to show flags on stream?
--- require('sc_flags')
+local safetyCarID
+local safetyCar
+local adminCarID
+local adminCar
 
 -- Safety Car Speeds and thresholds
-local trackLength = sim.trackLengthM
-local safetyCarPitLaneSpeed = 60
-local safetyCarInitialSpeed = 25
-local safetyCarSpeed = 120 -- Speed in km/h
-local safetyCarInSpeed = 999 -- flat out
-local scLeadDistThresholdMin = 150 -- update to adjust to speed of leader
-local distanceThresholdMeters = 500 -- replaced by N/connected cars calc
-local carSpacing = 35 -- multiplier for distance behind SC N x carSpacing
-local inPitTimeLimit = 120 -- seconds
-local carPitEntryTimes = {}
-local retiredCars = {}
-local previousGapToSC = {}
-local carsNotGainingOnSC = {}
-local gainingTimeThreshold = 2
+local trackLength
+local safetyCarPitLaneSpeed
+local safetyCarInitialSpeed
+local safetyCarSpeed
+local safetyCarInSpeed
+local scLeadDistThresholdMin
+local distanceThresholdMeters
+local carSpacing
+local inPitTimeLimit
+local carPitEntryTimes
+local retiredCars
+local previousGapToSC
+local carsNotGainingOnSC
+local gainingTimeThreshold
 
 -- Time accumulators
-local timeHalfSec = 0.5 -- seconds
-local timeHalfSecAccumulator = 0
-local timeShort = 1.5
-local timeShortAccumulator = 0
-local timeAccumulator = 0
-local timeMedium = 5
-local timeMediumAccumulator = 0
-local timeLong = 10
-local timeLongAccumulator = 0
+local timeHalfSec
+local timeHalfSecAccumulator
+local timeShort
+local timeShortAccumulator
+local timeAccumulator
+local timeMedium
+local timeMediumAccumulator
+local timeLong
+local timeLongAccumulator
 
 -- Session start variables
-local waitingToStartTimerOn = 0
-local waitingToStart = false
-local scActive = true
-local scActiveTime = 0
-local scActiveCheckStartPercentage = 0.5
-local gotAvgSessionTimes = false
-local checkClosestCarToSC = false
+local waitingToStartTimerOn
+local waitingToStart
+local scActive
+local scActiveTime
+local scActiveCheckStartPercentage
+local gotAvgSessionTimes
+local checkClosestCarToSC
 
 -- Check Thresholds
-local scDisableWithLapsToGo = 2
-local SC_CALLIN_THRESHOLD_START = 0.5
-local SC_CALLIN_THRESHOLD_END = 0.75
+local scDisableWithLapsToGo
+local SC_CALLIN_THRESHOLD_START
+local SC_CALLIN_THRESHOLD_END
 
 -- Leaderboard variables
-local carLeaderboard = {}
-local prevDistances = {}
-local hasCrossedSF = {}
-local prevSplines = {}
-local sfCheckHeartBeat = 1
-local sfCheckTime = 0
-local allCarsCrossed = false
+local carLeaderboard
+local prevDistances
+local hasCrossedSF
+local prevSplines 
+local sfCheckHeartBeat
+local sfCheckTime
+local allCarsCrossed
 
 -- Base state variables
-local scInPitLane = false
-local scOnTrack = false
-local scRequested = false
-local scHeadingToPit = false
-local scConditonsMet = false
-local scManualCallin = false
-local checkLeaderPos = false
-local underSCLapCount = 0
-local raceLeader = nil
+local scInPitLane
+local scOnTrack
+local scRequested
+local scHeadingToPit
+local scConditonsMet
+local scManualCallin
+local checkLeaderPos
+local underSCLapCount
+local raceLeader
 
--- Custom log file as the AC one gets overwritten | io does not work with online scripts
-local logFile
 
-function initializeSSStates()
-    -- Get states
-    sim = ac.getSim()
-    safetyCarID = ac.getCarByDriverName("Safety Car")
-    safetyCar = ac.getCar(safetyCarID)
-    currentSession = ac.getSession(sim.currentSessionIndex)
-    adminName = "Jon Astrop"
-
-    -- Load support scripts | Do we want to show flags on stream?
-    -- require('sc_flags')
-
-    -- Safety Car Speeds and thresholds
-    trackLength = sim.trackLengthM
-    safetyCarPitLaneSpeed = 60
-    safetyCarInitialSpeed = 25
-    safetyCarSpeed = 120 -- Speed in km/h
-    safetyCarInSpeed = 999 -- flat out
-    scLeadDistThresholdMin = 150 -- update to adjust to speed of leader
-    distanceThresholdMeters = 500 -- replaced by N/connected cars calc
-    carSpacing = 35 -- multiplier for distance behind SC N x carSpacing
-    inPitTimeLimit = 120 -- seconds
-    carPitEntryTimes = {}
-    retiredCars = {}
-    previousGapToSC = {}
-    carsNotGainingOnSC = {}
-    gainingTimeThreshold = 2
-
-    -- Time accumulators
-    timeHalfSec = 0.5 -- seconds
-    timeHalfSecAccumulator = 0
-    timeShort = 1.5
-    timeShortAccumulator = 0
-    timeAccumulator = 0
-    timeMedium = 5
-    timeMediumAccumulator = 0
-    timeLong = 10
-    timeLongAccumulator = 0
-
-    -- Session start variables
-    waitingToStartTimerOn = 0
-    waitingToStart = false
-    scActive = true
-    scActiveTime = 0
-    scActiveCheckStartPercentage = 0.5
-    gotAvgSessionTimes = false
-    checkClosestCarToSC = false
-
-    -- Check Thresholds
-    scDisableWithLapsToGo = 2
-    SC_CALLIN_THRESHOLD_START = 0.5
-    SC_CALLIN_THRESHOLD_END = 0.75
-
-    -- Leaderboard variables
-    carLeaderboard = {}
-    prevDistances = {}
-    hasCrossedSF = {}
-    prevSplines = {}
-    sfCheckHeartBeat = 1
-    sfCheckTime = 0
-    allCarsCrossed = false
-
-    -- Base state variables
-    scInPitLane = false
-    scOnTrack = false
-    scRequested = false
-    scHeadingToPit = false
-    scConditonsMet = false
-    scManualCallin = false
-    checkLeaderPos = false
-    underSCLapCount = 0
-    raceLeader = nil
+local function getSafetyCar()
+    safetyCarID = ac.getCarByDriverName(safetyCarName)
+    if safetyCarID then
+        safetyCar = ac.getCar(safetyCarID)
+    else
+        writeLog("SC: Safety Car not found during initialization")
+    end
+    return nil
 end
 
-local function openLogFile()
-    --[[
-    --local configPath = ac.getFolder(ac.FolderID.Root).."extension/lua/online/AC_RP_SafetyCar/"
-    --local logFilePath = configPath .. "safety_car_log.txt"
-    local logFilePath = "extension/lua/online/AC_RP_SafetyCar/safety_car_log.txt"
-    --logFile, msg = io.open(logFilePath, "a")
-    if not logFile then
-        ac.log("SC: Failed to open log file - " .. msg)
+local function getAdminCar()
+    adminCarID = ac.getCarByDriverName(adminName)
+    if adminCarID then
+        adminCar = ac.getCar(adminCarID)
     else
-        ac.log("SC: Log file opened at " .. logFilePath)
+        writeLog("SC: Admin car not found during initialization")
     end
-    ]]
+    return nil
 end
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    if logFile then        
-        logFile:write("[" .. timeStamp .. "] " .. message .. "\n")
-        logFile:flush()
-    end
-    ac.log(timeStamp .. " | " .. message) 
+    ac.log(timeStamp .. " | " .. message)
 end
 
 local function ensureSimAndSafetyCar()
@@ -193,21 +120,14 @@ local function ensureSimAndSafetyCar()
     return true
 end
 
-local function initializeSCScript()
-    -- TODO: This should apparently be called on script reload, need to figure out params etc.
-    -- ac.onRelease(callback, nil)
-    
+local function initializeSCScript()    
     writeLog("SC: Safety Car Script Initialized")
-    openLogFile()
     physics.setCarAutopilot(false, false)
     scOnTrack = false
     scRequested = false
     scHeadingToPit = false
 
-    if ac.getCarByDriverName(adminName) then
-        local adminCarID = ac.getCarByDriverName(adminName)
-        adminCar = ac.getCar(adminCarID)
-    end
+    getAdminCar()
 
     if ac.tryToTeleportToPits() then
         ac.tryToStart()
@@ -272,10 +192,10 @@ end
 
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
-    if senderCarIndex == safetyCar.index or senderCarIndex == adminCar.index then
+    if senderCarIndex == safetyCar.index or (adminCar and senderCarIndex == adminCar.index) then
         if message == "SC scon" then
             callSafetyCar()
-            writeLog("SC: SC scon recieved | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
+            writeLog("SC: SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
         elseif message == "SC scoff" then
             scManualCallin = true
             scConditonsMet = true
@@ -298,13 +218,11 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
 end)
 
 local function checkSFCrossing()
-    --for efficiency, once all cars are crossed then don't run this
     if allCarsCrossed then return end
-    --on the heartbeat
+
     if timeAccumulator - sfCheckTime  >= sfCheckHeartBeat then
         local anyFalse = false
 
-        --iterate the list of cars
         for i, car in ac.iterateCars.ordered() do
             --first go we will have no stored splines
             if prevSplines[car.index] == nil then
@@ -330,7 +248,7 @@ local function getLeaderboard()
     --ac.log("get leaderboard")
     local carPosList = {}
     for i, car in ac.iterateCars.ordered() do
-        if car == safteyCar or car.isInPit or car.isInPitlane then
+        if car == safetyCar or car.isInPit or car.isInPitlane then
             break
         end
 
@@ -488,7 +406,7 @@ end
 local function sessionTimeCalcs()
     if not currentSession then return false end
 
-    local averageBestLapTime = calculateAverageBestLapTime(currentSession)
+    local averageBestLapTime = calculateAverageBestLapTime(currentSession) or 0
     local sessionLength = 0
 
     if currentSession.isTimedRace then
@@ -595,6 +513,7 @@ function script.update(dt)
             if csTime > scActiveTime and scActiveTime > 0 then
                 scActive = false
             end
+            ac.debug("SC: SC Active", scActive)
         end
 
         if carLeaderboard[1] then
@@ -722,6 +641,75 @@ function script.update(dt)
 
 end
 
+function initializeSSStates()
+    -- Get states
+    sim = ac.getSim()
+    currentSession = ac.getSession(sim.currentSessionIndex)
+    getSafetyCar()
+    getAdminCar()
+
+    -- Safety Car Speeds and thresholds
+    trackLength = sim.trackLengthM
+    safetyCarPitLaneSpeed = 60
+    safetyCarInitialSpeed = 25
+    safetyCarSpeed = 120 -- Speed in km/h
+    safetyCarInSpeed = 999 -- flat out
+    scLeadDistThresholdMin = 150 -- update to adjust to speed of leader
+    distanceThresholdMeters = 500 -- replaced by N/connected cars calc
+    carSpacing = 35 -- multiplier for distance behind SC N x carSpacing
+    inPitTimeLimit = 120 -- seconds
+    carPitEntryTimes = {}
+    retiredCars = {}
+    previousGapToSC = {}
+    carsNotGainingOnSC = {}
+    gainingTimeThreshold = 2
+
+    -- Time accumulators
+    timeHalfSec = 0.5 -- seconds
+    timeHalfSecAccumulator = 0
+    timeShort = 1.5
+    timeShortAccumulator = 0
+    timeAccumulator = 0
+    timeMedium = 5
+    timeMediumAccumulator = 0
+    timeLong = 10
+    timeLongAccumulator = 0
+
+    -- Session start variables
+    waitingToStartTimerOn = 0
+    waitingToStart = false
+    scActive = true
+    scActiveTime = 0
+    scActiveCheckStartPercentage = 0.5
+    gotAvgSessionTimes = false
+    checkClosestCarToSC = false
+
+    -- Check Thresholds
+    scDisableWithLapsToGo = 2
+    SC_CALLIN_THRESHOLD_START = 0.5
+    SC_CALLIN_THRESHOLD_END = 0.75
+
+    -- Leaderboard variables
+    carLeaderboard = {}
+    prevDistances = {}
+    hasCrossedSF = {}
+    prevSplines = {}
+    sfCheckHeartBeat = 1
+    sfCheckTime = 0
+    allCarsCrossed = false
+
+    -- Base state variables
+    scInPitLane = false
+    scOnTrack = false
+    scRequested = false
+    scHeadingToPit = false
+    scConditonsMet = false
+    scManualCallin = false
+    checkLeaderPos = false
+    underSCLapCount = 0
+    raceLeader = nil
+end
+
 ac.onSessionStart(function(sessionIndex, restarted)
     currentSession = ac.getSession(sessionIndex)
     initializeSSStates()
@@ -729,4 +717,5 @@ ac.onSessionStart(function(sessionIndex, restarted)
     writeLog("SC: Safety Car Script Initialized on Session Start")
 end)
 
+initializeSSStates()
 initializeSCScript()
