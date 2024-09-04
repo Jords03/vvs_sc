@@ -67,6 +67,7 @@ local scFlagSettings = false
 local goGreen = false
 local onTrack = false
 local enterPits = false
+local headingToPits = false
 local getCarLapCounts = false
 local checkGoGreen = false
 local carLapCounts = {}
@@ -152,6 +153,7 @@ local function reInitailizeVars ()
     goGreen = false
     onTrack = false
     enterPits = false
+    headingToPits = false
     getCarLapCounts = false
     checkGoGreen = false
     carLapCounts = {}
@@ -191,7 +193,7 @@ local function reInitailizeVars ()
     timeToDisplayGreenAccumulator = 0
     miniCheckInterval = 0.1
     shortCheckInterval = 1
-    medCheckInterval = 3
+    medCheckInterval = 2
     checkStatesInterval = 60
     timeToDisplaySCText = 2
     timeToDisplayGreen = 6
@@ -329,12 +331,13 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             scHeadingTextColor = rgbm.colors.yellow
             scStatusText = scState.deployed
             scHeadingText = scHeadingTextState.sc
-            scLeaderText = scLeaderTextState.leader
+            --scLeaderText = scLeaderTextState.leader
+            headingToPits = false
             showFlags = true
             goGreen = false
             onTrack = true
             audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
-            audioSCDeployedEvent.volume = 15
+            audioSCDeployedEvent.volume = 10
             audioSCDeployedEvent:start()
         elseif message == "SC: Safety Car is heading to pits" then
             writeLog("SC: Recieved - Safety Car is heading to pits")
@@ -342,11 +345,12 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             scStatusText = scState.returning
             scTextColor = rgbm.colors.black
             scLeaderText = scLeaderTextState.off
+            headingToPits = true
             showFlags = true
             goGreen = false
             onTrack = true
             audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
-            audioSCInThisLapEvent.volume = 15
+            audioSCInThisLapEvent.volume = 10
             audioSCInThisLapEvent:start()
             timeToDisplayTextAccumulator = timeAccumulator
         elseif message == "SC: Safety Car is entering pit lane" then
@@ -506,10 +510,11 @@ local function detectErraticAndPos(dt)
 
         -- Check if the driver is a lap down and between the race leader and the Safety Car
         local distanceBehindLeader = calculateDistanceBehind(car.splinePosition, raceLeaderPos.splinePosition)
+        -- We actually don't care if they are a lap down, just if they are between the leader and the SC
         local lapDownFromLeader = (raceLeaderPos.lapCount > car.lapCount)
         local betweenLeaderAndSafetyCar = (distanceBehindLeader < distanceBehindSC)
 
-        if lapDownFromLeader and betweenLeaderAndSafetyCar then
+        if betweenLeaderAndSafetyCar then
             passSafetyCar = true
         end
 
@@ -637,8 +642,8 @@ local function uiFlags(dt)
         ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
         
         if driverCar ~= safetyCar then
-            if carLeaderboard[1] then
-                if driverCar == carLeaderboard[1].car then
+            if raceLeaderPos then
+                if driverCar == raceLeaderPos then
                     ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
                     scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
                 end
@@ -682,8 +687,8 @@ function script.update(dt)
     end
 
     ac.debug("SC Flags: driverCar", driverCar:driverName())
-    if carLeaderboard[1] then
-        ac.debug("SC Flags: leaderboard 1", carLeaderboard[1].car:driverName())
+    if raceLeaderPos then
+        ac.debug("SC Flags: leaderboard 1", raceLeaderPos:driverName())
     end
 
     --[[
@@ -701,6 +706,9 @@ function script.update(dt)
             if timeAccumulator - leaderCheckTime >= medCheckInterval then
                 carLeaderboard = getLeaderboard()
                 raceLeaderPos = carLeaderboard[1].car
+                if not headingToPits and driverCar == raceLeaderPos then
+                    scLeaderText = scLeaderTextState.leader
+                end
                 leaderCheckTime = timeAccumulator
             end
 
@@ -776,7 +784,7 @@ function script.update(dt)
                     goGreen = true
                     
                     audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-                    audioSCGoGreenEvent.volume = 15
+                    audioSCGoGreenEvent.volume = 10
                     audioSCGoGreenEvent:start()
 
                     checkGoGreen = false
