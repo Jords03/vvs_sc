@@ -551,7 +551,7 @@ local function detectErraticAndPos(dt)
             end
 
             if newHelperTextState ~= previousHelperTextState then
-                if car == raceLeaderPos and car.splinePosition > 0.8 and scState.returning then
+                if car == raceLeaderPos and car.splinePosition > 0.8 and scStatusText == scState.returning then
                     scHelperText = scHelperTextState.off
                 else
                     scHelperText = newHelperTextState
