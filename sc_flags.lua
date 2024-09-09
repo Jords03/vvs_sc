@@ -1,7 +1,7 @@
 -- Get states
 local sim = ac.getSim()
 local currentSession = ac.getSession(sim.currentSessionIndex)
-local driverCar = ac.getCar()
+local driverCar = ac.getCar(0)
 local safetyCarName = "Safety Car"
 local safetyCar
 local adminCarName = "Jon Astrop"
@@ -13,7 +13,7 @@ local function getStates()
     if sim then
         currentSession = currentSession or ac.getSession(sim.currentSessionIndex)
     end
-    driverCar = driverCar or ac.getCar()
+    driverCar = driverCar or ac.getCar(0)
     if not safetyCar then
         local safetyCarID = ac.getCarByDriverName(safetyCarName)
         if safetyCarID then
@@ -27,7 +27,6 @@ local function getStates()
         end
     end
 end
-
 
 -- Safety Car state variables
 local scState = {
@@ -53,7 +52,7 @@ local scLeaderTextState = {
 }
 
 local scHelperTextState = {
-    catchPack = "CATCH THE SAFETY CAR",
+    catchSC = "CATCH THE SAFETY CAR",
     closeGap = "TOO FAR - CLOSE GAP",
     erratic = "DON'T DRIVE ERRATICALLY",
     passSafetyCar = "PASS SAFETY CAR - CATCH PACK",
@@ -72,8 +71,7 @@ local getCarLapCounts = false
 local checkGoGreen = false
 local carLapCounts = {}
 local prevSCState = ""
-local raceLeader = nil
-local raceLeaderPos = nil
+local raceLeaderCar = nil
 
 -- Leaderboard variables
 local carLeaderboard = {}
@@ -138,11 +136,12 @@ local previousDriverCarState = nil
 local previousSpeed = nil
 local previousHelperTextState = nil
 local distanceThreshold = 28
+local distanceEndingThreshold = 500
 
 -- Combined threshold values for detecting erratic behavior
 local erraticThresholds = {
     suddenSpeedChange = 5,    -- km/h
-    suddenSteer = 18,         -- degrees
+    suddenSteer = 20,         -- degrees
     highAngularVelocity = 0.85   -- rad/s, for swerving detection
 }
 
@@ -158,8 +157,7 @@ local function reInitailizeVars ()
     checkGoGreen = false
     carLapCounts = {}
     prevSCState = ""
-    raceLeader = nil
-    raceLeaderPos = nil
+    raceLeaderCar = nil
 
     -- Leaderboard variables
     carLeaderboard = {}
@@ -236,7 +234,7 @@ local function repositionFlags()
     ac.debug("scFlagsSettings", scFlagSettings)
     scStatusText = scState.settings
     scLeaderText = scLeaderTextState.leader
-    scHelperText = scHelperTextState.catchPack
+    scHelperText = scHelperTextState.catchSC
 end
 
 local function initializeSCFlagScript()
@@ -305,10 +303,6 @@ local function logAudioCallback(err, folder)
     audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
     audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
     audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-
-    --writeLog("SC: audioSCDeployedEvent Vol: " .. audioSCInThisLapEvent.volume)
-    --writeLog("SC: audioSCInThisLapEvent Vol: " .. audioSCInThisLapEvent.volume)
-    --writeLog("SC: audioSCGoGreenEvent Vol: " .. audioSCGoGreenEvent.volume)
 
     audioLoaded = true
 end
@@ -390,7 +384,7 @@ local function checkSFCrossing()
         local anyFalse = false
 
         --iterate the list of cars
-        for i, car in ac.iterateCars.ordered() do
+        for i, car in ac.iterateCars.leaderboard() do
             --first go we will have no stored splines
             if prevSplines[car.index] == nil then
                 prevSplines[car.index] = car.splinePosition
@@ -412,57 +406,23 @@ local function checkSFCrossing()
 end
 
 local function getLeaderboard()
-    --ac.log("get leaderboard")
     local carPosList = {}
-    for i, car in ac.iterateCars.ordered() do
-        if car == safetyCar then
-            break
+    for i, car in ac.iterateCars.leaderboard() do
+        if not (car == safetyCar or car.isInPit or car.isInPitlane) then
+            carPosList[#carPosList + 1] = {car=car, racePosition=car.racePosition}
         end
-
-        --get distance
-        local distanceDriven = (car.splinePosition * trackLength) + (car.lapCount * trackLength)
-        
-        if prevDistances[car.index] == nil then
-            prevDistances[car.index] = trackLength * -2
-        end
-
-        --deal with cars that haven't crossed the SF yet - given them a negative distance driven that approaches 0 as they get to the line
-        --only applies to cars with lap count of 0
-        if car.lapCount == 0 then
-            --for cars that haven't yet crossed the start finish
-            if hasCrossedSF[car.index] == nil then
-                --sanity check that the spline is over 0.1 so we don't accidentally pick up someone that has just crossed the line
-                if car.splinePosition > 0.1 then
-                    distanceDriven = (1 - car.splinePosition) * trackLength * -1
-                end
-            end
-        end
-
-        --writeLog(car.splinePosition .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. prevDistances[car.index] )
-
-        -- sanity check - if it's less than the previous distance then discard and go with previous measurement
-        if not car.isInPit and car.speedKmh > 3 then
-            if distanceDriven >= prevDistances[car.index]-1 then
-                prevDistances[car.index] = distanceDriven
-            else
-                writeLog("SANITY CHECK FAILED! " .. car:driverName() .. car.splinePosition .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. prevDistances[car.index] )
-                distanceDriven = prevDistances[car.index]
-            end
-        end
-
-        carPosList[#carPosList + 1] = {car=car, distanceDriven=distanceDriven}
     end
-    table.sort(carPosList, function (k1, k2) return k1.distanceDriven > k2.distanceDriven end )
-    --[[for pos=1, #carPosList, 1 do
-        writeLog(carPosList[pos].car:driverName() .. " - in position " .. pos ..  " - distanceDriven " .. carPosList[pos].distanceDriven .. " - lap count " .. carPosList[pos].car.lapCount)
-    end]]
+    table.sort(carPosList, function (k1, k2) return k1.racePosition < k2.racePosition end )
+    for pos=1, #carPosList, 1 do
+        ac.debug("SC Flags: Leaderboard ".. pos .. ": ", carPosList[pos].car:driverName())
+        writeLog(carPosList[pos].car:driverName() .. " - in position " .. pos .. " | CSPpos (" .. carPosList[pos].car.racePosition .. ") - lap count " .. carPosList[pos].car.lapCount)
+    end
     return carPosList
-    
 end
 
 -- Calculate the normalized distance behind the safety car
-local function calculateDistanceBehind(carPosition, scPosition)
-    local distance = (scPosition - carPosition) % 1
+local function calculateDistanceBehind(carPosition, otherPosition)
+    local distance = (otherPosition - carPosition) % 1
     return distance  -- Always a value between 0 and 1
 end
 
@@ -473,18 +433,18 @@ local function detectErraticAndPos(dt)
     if car then
         local carAhead = nil
         local tooFar = false
-        local catchPack = false
+        local catchSC = false
         local passSafetyCar = false
         local distanceToSC = 0
         carDistance = 0
 
-        -- Calculate the distance behind the safety car and the race leader
+        -- Calculate the distance behind the safety car
         local distanceBehindSC = calculateDistanceBehind(car.splinePosition, safetyCar.splinePosition)
         distanceToSC = distanceBehindSC * trackLength
 
-        -- For other drivers, find the next car ahead
+        -- Find the next car ahead on track
         local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
-        for i, otherCar in ac.iterateCars.ordered() do
+        for i, otherCar in ac.iterateCars.leaderboard() do
             if otherCar ~= safetyCar and otherCar ~= car then
                 local distanceAhead = calculateDistanceBehind(car.splinePosition, otherCar.splinePosition)
                 if distanceAhead > 0 and distanceAhead < minDistanceAhead then
@@ -492,30 +452,26 @@ local function detectErraticAndPos(dt)
                     carAhead = otherCar
                 end
             end
-            if car == raceLeaderPos then
-                minDistanceAhead = distanceBehindSC
-                carAhead = safetyCar
+        end
+        -- if leader then car ahead is the safety car
+        if car == raceLeaderCar then
+            carAhead = safetyCar
+            minDistanceAhead = distanceBehindSC
+        else
+            local distanceBehindLeader = calculateDistanceBehind(car.splinePosition, raceLeaderCar.splinePosition)
+            local betweenLeaderAndSafetyCar = (distanceBehindLeader >= distanceBehindSC)
+            if betweenLeaderAndSafetyCar then
+                passSafetyCar = true
             end
         end
-
         -- Calculate the distance to the car ahead
         if carAhead then
             carDistance = minDistanceAhead * trackLength
             ac.debug("SC Flags: minDistanceAhead", minDistanceAhead)
             tooFar = carDistance > distanceThreshold
             if (carDistance > (distanceThreshold * 3)) then
-                catchPack = true
+                catchSC = true
             end
-        end
-
-        -- Check if the driver is a lap down and between the race leader and the Safety Car
-        local distanceBehindLeader = calculateDistanceBehind(car.splinePosition, raceLeaderPos.splinePosition)
-        -- We actually don't care if they are a lap down, just if they are between the leader and the SC
-        local lapDownFromLeader = (raceLeaderPos.lapCount > car.lapCount)
-        local betweenLeaderAndSafetyCar = (distanceBehindLeader < distanceBehindSC)
-
-        if betweenLeaderAndSafetyCar then
-            passSafetyCar = true
         end
 
         if previousDriverCarState then
@@ -546,9 +502,9 @@ local function detectErraticAndPos(dt)
             
             if passSafetyCar then
                 newHelperTextState = scHelperTextState.passSafetyCar
-            elseif catchPack then
-                --newHelperTextState = scHelperTextState.catchPack
-                newHelperTextState = scHelperTextState.catchPack .. " - " .. math.floor(carDistance) .. "m"
+            elseif catchSC then
+                --newHelperTextState = scHelperTextState.catchSC
+                newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
             elseif erraticActive then  -- Use the timer-controlled state instead of direct isErratic
                 newHelperTextState = scHelperTextState.erratic
             elseif tooFar then
@@ -556,7 +512,8 @@ local function detectErraticAndPos(dt)
             end
 
             if newHelperTextState ~= previousHelperTextState then
-                if car == raceLeaderPos and car.splinePosition > 0.85 and scStatusText == scState.returning then
+                local leaderDistanceCheck = (car.splinePosition * trackLength) > (trackLength - distanceEndingThreshold)
+                if car == raceLeaderCar and leaderDistanceCheck and scStatusText == scState.returning then
                     scHelperText = scHelperTextState.off
                 else
                     scHelperText = newHelperTextState
@@ -568,20 +525,17 @@ local function detectErraticAndPos(dt)
             ac.debug("SC Flags: newHelperTextState", newHelperTextState)
             ac.debug("SC Flags: DT", dt)
             ac.debug("SC Flags: 1-Driver", car:driverName())
-            ac.debug("SC Flags: 2-RaceLeaderPos", raceLeaderPos:driverName())
+            ac.debug("SC Flags: 2-RaceLeaderCar", raceLeaderCar:driverName())
             ac.debug("SC Flags: 3-distanceToSC", distanceToSC)
             ac.debug("SC Flags: 4-carDistance", carDistance)
-            ac.debug("SC Flags: speedChange", speedChange)
-            ac.debug("SC Flags: steerChange", steerChange)
-            ac.debug("SC Flags: angularVelocityChange", angularVelocityChange)
-            ac.debug("SC Flags: catchPack", catchPack)
+            ac.debug("SC Flags: catchSC", catchSC)
             ac.debug("SC Flags: isErratic", isErratic)
             ac.debug("SC Flags: erraticActive", erraticActive)
             ac.debug("SC Flags: tooFar", tooFar)
             ac.debug("SC Flags: prevState", true)
         else
             ac.debug("SC Flags: prevState", false)
-            scHelperText = scHelperTextState.catchPack .. " - " .. math.floor(carDistance) .. "m"
+            scHelperText = scHelperTextState.off
         end
 
         -- Update previous driver car state for the next frame
@@ -592,7 +546,6 @@ local function detectErraticAndPos(dt)
         }
     end
 end
-
 
 
 local function textSize(text_size, fontsize)
@@ -642,8 +595,8 @@ local function uiFlags(dt)
         ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
         
         if driverCar ~= safetyCar then
-            if raceLeaderPos then
-                if driverCar == raceLeaderPos then
+            if raceLeaderCar then
+                if driverCar == raceLeaderCar then
                     ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
                     scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
                 end
@@ -687,8 +640,8 @@ function script.update(dt)
     end
 
     ac.debug("SC Flags: driverCar", driverCar:driverName())
-    if raceLeaderPos then
-        ac.debug("SC Flags: leaderboard 1", raceLeaderPos:driverName())
+    if raceLeaderCar then
+        ac.debug("SC Flags: leaderboard #1", raceLeaderCar:driverName())
     end
 
     --[[
@@ -705,8 +658,8 @@ function script.update(dt)
             -- Determine the race leader
             if timeAccumulator - leaderCheckTime >= medCheckInterval then
                 carLeaderboard = getLeaderboard()
-                raceLeaderPos = carLeaderboard[1].car
-                if not headingToPits and driverCar == raceLeaderPos then
+                raceLeaderCar = carLeaderboard[1].car
+                if not headingToPits and driverCar == raceLeaderCar then
                     scLeaderText = scLeaderTextState.leader
                 end
                 leaderCheckTime = timeAccumulator
@@ -742,38 +695,25 @@ function script.update(dt)
             end
         end
 
-        if getCarLapCounts then      
-            local maxSplinePosition = -1
-
-            for i, car in ac.iterateCars.ordered() do
+        if getCarLapCounts then
+            for i, car in ac.iterateCars.leaderboard() do
                 if car.splinePosition > safetyCar.splinePosition then
                     carLapCounts[car.index] = 9999
                 else
                     carLapCounts[car.index] = car.lapCount or 0
-                   
-                    if car.splinePosition > maxSplinePosition then
-                        maxSplinePosition = car.splinePosition
-                        raceLeader = car
-                    end
                 end
                 writeLog("SC: Car ID: " .. car.index .. " on lap " .. car.lapCount)
             end
-
-            if raceLeader then
-                writeLog("SC: Race Leader: " .. raceLeader:driverName() .. " (Car ID: " .. raceLeader.index .. ")")
-            end
-
             checkGoGreen = true
             getCarLapCounts = false
         end
 
         if checkGoGreen then
-            for i, car in ac.iterateCars.ordered() do
-                if car == safetyCarID or car.isInPitlane or car.isInPit then
+            for i, car in ac.iterateCars.leaderboard() do
+                if car == safetyCar or car.isInPitlane or car.isInPit then
                     ac.debug("SC: Car Info: ", car:driverName())
                 elseif car.lapCount > carLapCounts[car.index] then
                     writeLog("SC: Car ID: " .. car:driverName() .. " crossed start finish")
-                    writeLog("SC: Leader Go Green")
                     flagColor = rgbm(0,225,0,1)
                     scHeadingTextColor = rgbm(0,225,0,1)
                     scHeadingText = scHeadingTextState.green
