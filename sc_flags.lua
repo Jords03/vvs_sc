@@ -56,6 +56,7 @@ local scLeaderTextState = {
 
 local scHelperTextState = {
     catchSC = "CATCH THE SAFETY CAR",
+    catchPack = "CATCH THE PACK",
     closeGap = "TOO FAR - CLOSE GAP",
     erratic = "DON'T DRIVE ERRATICALLY",
     passSafetyCar = "PASS SAFETY CAR - CATCH PACK",
@@ -542,7 +543,11 @@ local function detectErraticAndPos(dt)
                 newHelperTextState = scHelperTextState.passSafetyCar
             elseif catchSC then
                 --newHelperTextState = scHelperTextState.catchSC
-                newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
+                if car == raceLeaderCar then
+                    newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
+                else
+                    newHelperTextState = scHelperTextState.catchPack .. " - " .. math.floor(carDistance) .. "m"
+                end
             elseif erraticActive then  -- Use the timer-controlled state instead of direct isErratic
                 newHelperTextState = scHelperTextState.erratic
             elseif tooFar then
@@ -559,7 +564,7 @@ local function detectErraticAndPos(dt)
                     -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
                     if previousMinus1HelpertextState == nil then
                         --prev minus 1 is nil so this is the first beat that we changed, if this is one that we need to sanitise then just store it
-                        if newHelperTextState == scHelperTextState.catchSC or newHelperTextState == scHelperTextState.closeGap then
+                        if newHelperTextState == scHelperTextState.catchSC or newHelperTextState == scHelperTextState.closeGap or newHelperTextState == scHelperTextState.catchPack  then
                             previousMinus1HelpertextState = newHelperTextState
                         else
                             --it isn't one we care about sanitising to just store prev and set this one
