@@ -12,7 +12,7 @@ local adminName = "Jon Astrop"
 local startBehindSC = false
 
 --shared data structure for real car data
-local sharedData = ac.connect {
+local sharedData = ac.connect({
     ac.StructItem.key('vvs.car_tracker'),
     raceHasStarted = ac.StructItem.boolean(),
     activeCarsCount = ac.StructItem.int16(),
@@ -21,266 +21,8 @@ local sharedData = ac.connect {
         splinePosition = ac.StructItem.double(),
         distanceDriven = ac.StructItem.double(),
         isRetired = ac.StructItem.boolean()
-    }), 50)
-}
-
---#############################################################
---################# CAR TRACKER LOGIC #########################
---#############################################################
-
-local trackLength = sim.trackLengthM
-
--- Time variables and heartbeats
-local timeAccumulator = 0
-local realDistanceCheckHeartbeat = 0.1
-local realDistanceCheckTime = 0
-local stateCheckHeartbeat = 0.5
-local stateCheckTime = 0
-local startCheckHeartBeat = 0.1
-local startCheckTime = 0
-local startDelayTime = 0
-local sfCheckHeartBeat = 1
-local sfCheckTime = 0
-
---latch for run once activities
-local runOnceTable = {}
-
---is this a race
-local isRace = false
-
--- Custom log file as the AC one gets overwritten
-local logFile
-
---retired car list
-local retiredCars = {}
---tracker of real distances
-local realDistancesTracker = {}
---tracker for initial sf crossing
-local hasCrossedSF = {}
---previous splines (udsed for sf crossing)
-local prevSplines = {}
---previous distances (used for logging discrepancies)
-local prevDistances = {}
---set once all cars have crossed SF to disable that check
-local allCarsCrossed = false
-
-local function openLogFiles()
-    
-    local logFilePath = "apps/lua/car_tracker/car_tracker_log.txt"
-    local msg
-    logFile, msg = io.open(logFilePath, "a")
-    if not logFile then
-        ac.log("Failed to open log file - " .. msg)
-    else
-        ac.log("Log file opened at " .. logFilePath)
-    end
-end
-
---utility function to convert milliseconds to minutes:seconds - used for logging
-local function millisecondsToClock(milliseconds)
-    local isNegative = false
-    if milliseconds < 0 then
-        isNegative = true
-        milliseconds = milliseconds * -1
-    end
-
-    local mins = string.format("%02.f", math.floor(milliseconds/60000));
-    local secs = string.format("%02.f", math.floor((milliseconds - mins*60000)/1000));
-    local cs = string.format("%02.f", math.floor((milliseconds - (mins*60000) - (secs*1000))/10));
-
-    if isNegative then
-        return "-"..mins..":"..secs.."."..cs
-    else
-        return mins..":"..secs.."."..cs
-    end
-
-end
-
---utility function to log messages
-local function writeLog(message)
-    local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    local runningTime = timeAccumulator
-    local timeLeft = millisecondsToClock(sim.sessionTimeLeft)
-    ac.log(timeStamp .. " | " .. timeLeft .. " | " .. runningTime .. " | CAR_TRACKER | " .. message) -- log to the default writeLog
-    --log to custom file
-    if logFile then    
-        logFile:write("[" .. timeStamp .. " | " .. timeLeft .. " | " .. runningTime .. "] " .. message .. "\n")
-        logFile:flush()
-    end
-end
-
---get the median recorded values from last 10 measurements
-local function getRealValues(carIndex)
-    local copyTable = {}
-    for k,v in pairs(realDistancesTracker[carIndex]) do
-        copyTable[k] = v
-    end
-    table.sort(copyTable, function (k1, k2) return k1.distanceDriven > k2.distanceDriven end )
-    return copyTable[5]
-end
-
---calc distance driven of car - log out anomalies
-local function getDistance(car) 
-    local splinePos = car.splinePosition
-    local distanceDriven = (splinePos * trackLength) + (car.lapCount * trackLength)
-
-    --deal with cars that haven't crossed the SF yet - given them a negative distance driven that approaches 0 as they get to the line
-    --only applies to cars with lap count of 0
-    if car.lapCount == 0 then
-        --for cars that haven't yet crossed the start finish
-        if hasCrossedSF[car.index] == nil then
-            --sanity check that the spline is over 0.1 so we don't accidentally pick up someone that has just crossed the line
-            if splinePos > 0.1 then
-                distanceDriven = (1 - splinePos) * trackLength * -1
-            end
-        end
-    end
-
-    if prevDistances[car.index] == nil then
-        prevDistances[car.index] = trackLength * -2
-    end
-
-    --log out discrepancies
-
-    --don't worry about this if it's the first frame
-    if prevDistances[car.index] ~= trackLength * -2 then
-        --don't bother logging anything around the start finish line
-        if splinePos>0.01 and splinePos<0.99 then
-            --ignore finished and retired cars
-            if not car.isRetired and retiredCars[car.index] == nil and not car.isRaceFinished then
-                --have we jumped back?
-                if distanceDriven >= prevDistances[car.index] - 50 then
-                    --no, so check we haven't jumped too far ahead
-                    if distanceDriven >= prevDistances[car.index] + 50 then          
-                        writeLog("BLIP - JUMP AHEAD DETECTED! " .. car:driverName() .. "|" .. splinePos .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. prevDistances[car.index] )
-                        for i,n in ipairs(realDistancesTracker[car.index]) do writeLog(i .. ": " .. n.splinePosition .. "|" .. n.distanceDriven .. "|" .. n.timeString) end
-                    end
-                else
-                    --yes so log jump back
-                    writeLog("BLIP - JUMP BACK DETECTED! " .. car:driverName() .. "|" .. splinePos .. "|" .. trackLength .. "|" .. car.lapCount .. "|".. distanceDriven .. "|" .. prevDistances[car.index] )
-                    for i,n in ipairs(realDistancesTracker[car.index]) do writeLog(i .. ": " .. n.splinePosition .. "|" .. n.distanceDriven .. "|" .. n.timeString) end
-                end
-            end
-        end
-    end
-
-      --store previous distance calc
-      prevDistances[car.index] = distanceDriven
-
-      return distanceDriven
-end
-
---store the distances to enable the sanity checking + extra stuff useful for logging
-local function storeRealDistances() 
-    for i, car in ac.iterateCars.ordered() do
-        table.remove(realDistancesTracker[car.index],1)
-        table.insert(realDistancesTracker[car.index], {splinePosition=car.splinePosition, distanceDriven=getDistance(car), timeString=os.date("%Y-%m-%d %H:%M:%S") .. " | " .. millisecondsToClock(sim.sessionTimeLeft) .. " | " .. timeAccumulator})
-        --for i,n in ipairs(realSplinesTracker[car.index]) do writeLog(i .. ": " .. n) end
-    end
-end
-
---init the real distances array
-local function initRealDistances() 
-    writeLog("Splines intitialised")
-    for i, car in ac.iterateCars.ordered() do
-        local distance = getDistance(car)
-        realDistancesTracker[car.index] = {}
-        for j=1,10 do
-            table.insert(realDistancesTracker[car.index],{splinePosition=car.splinePosition, distanceDriven=distance, timeString=os.date("%Y-%m-%d %H:%M:%S") .. " | " .. millisecondsToClock(sim.sessionTimeLeft) .. " | " .. timeAccumulator})
-        end
-    end
-    
-end
-
---check for SF Cross
-local function checkSFCrossing()
-    --for efficiency, once all cars are crossed then don't run this
-    if allCarsCrossed then return end
-    --on the heartbeat
-    if timeAccumulator - sfCheckTime  >= sfCheckHeartBeat then
-        local anyFalse = false
-
-        --iterate the list of cars
-        for i, car in ac.iterateCars.ordered() do
-            --ignore the safety car
-            if car:driverName() ~= "Safety Car" then
-                --if car has already crossed then we don't need to do the check
-                if hasCrossedSF[car.index] == nil then
-                    --first go we will have no stored splines
-                    if prevSplines[car.index] == nil then
-                        prevSplines[car.index] = car.splinePosition
-						if car.splinePosition < 0.4 then
-							writeLog("Car has started in front of sf " .. car:driverName() )
-                            hasCrossedSF[car.index] = true
-						end
-                    else
-                        --spline has gone from 0.9x to 0.0x
-						--writeLog("spline check " .. car:driverName() .. "|" .. prevSplines[car.index] .. "|" .. car.splinePosition )
-                        if prevSplines[car.index] > 0.9 and car.splinePosition < 0.1 then
-							writeLog("Car has crossed sf " .. car:driverName() )
-                            hasCrossedSF[car.index] = true
-                        end
-						prevSplines[car.index] = car.splinePosition
-                    end
-                    --check if any are false still
-                    if hasCrossedSF[car.index] == nil then
-                        anyFalse = true
-                    end
-                end
-            end
-        end
-        --all cars have passed the check, disable it
-        if not anyFalse then 
-            allCarsCrossed = true 
-            writeLog("All cars have crossed the SF for the first time - sfCheck now disabled")
-        end
-        sfCheckTime = timeAccumulator
-    end
-end
-
---store the real car data that can be used by the other apps
-local function storeCarData()
-    writeLog("Storing Car Data")
-    local carPosList = {}
-
-    for i, car in ac.iterateCars.ordered() do
-        --get distance
-        local realValues = getRealValues(car.index)
-        local splinePos = realValues.splinePosition
-        local distanceDriven = realValues.distanceDriven
-        local isRetired = car.isRetired or retiredCars[car.index] ~= nil
-        carPosList[#carPosList + 1] = {carId=car.index, distanceDriven=distanceDriven, splinePosition = splinePos, isRetired = isRetired}
-    end
-
-    --sort by distance driven
-    table.sort(carPosList, function (k1, k2) return k1.distanceDriven > k2.distanceDriven end )
-
-    --save values to shared memory
-    sharedData.activeCarsCount = #carPosList
-    writeLog("Active Cars Count: " .. sharedData.activeCarsCount)
-    local storeCarsArray = {}
-    --seems the shred mem thing wants to try to be zero based and it fucks everything up - stick some dummy vals in the 0 position to deal with that
-    storeCarsArray[0] = {carId = 0, splinePosition = 0, 0, false}
-    for pos=1, #carPosList, 1 do
-        storeCarsArray[pos] = {carId = carPosList[pos].carId, splinePosition = carPosList[pos].splinePosition, distanceDriven = carPosList[pos].distanceDriven, isRetired = carPosList[pos].isRetired}
-        writeLog("Car " .. storeCarsArray[pos].carId .. " | " .. storeCarsArray[pos].distanceDriven .. " | " .. storeCarsArray[pos].splinePosition .. " | " .. tostring(storeCarsArray[pos].isRetired))
-    end
-    sharedData.carsArray = storeCarsArray;
-end
-
---Run once latch mechanism - on the first call each session for a given key this returns true, false thereafter
-local function hasNotBeenRunThisSession(key)
-    if runOnceTable[key] == nil then
-        runOnceTable[key] = "1"
-        return true
-    else
-        return false
-    end
-end
-
---#############################################################
---################# CAR TRACKER LOGIC END #####################
---#############################################################
+      }),50)
+    }, true, ac.SharedNamespace.Shared)
 
 
 local safetyCarID
@@ -289,7 +31,7 @@ local adminCarID
 local adminCar
 
 -- Safety Car Speeds and thresholds
---local trackLength
+local trackLength
 local safetyCarPitLaneSpeed
 local safetyCarInitialSpeed
 local safetyCarSpeed
@@ -299,7 +41,7 @@ local distanceThresholdMeters
 local carSpacing
 local inPitTimeLimit
 local carPitEntryTimes
---local retiredCars
+local retiredCars
 local previousGapToSC
 local carsNotGainingOnSC
 local gainingTimeThreshold
@@ -792,73 +534,6 @@ function script.update(dt)
     -- stop if not enough cars connected
     if sim.connectedCars < (minConnectedCars + 1) then return end
 
-    --#############################################################
-    --################# CAR TRACKER LOGIC START ###################
-    --#############################################################
-  
-    --check for race start
-    if timeAccumulator - startCheckTime  >= startCheckHeartBeat then
-        startCheckTime = timeAccumulator
-        if sim.timeToSessionStart < 250 and sim.timeToSessionStart > 50 then
-            if hasNotBeenRunThisSession("racestartcountdown") then
-                startDelayTime = timeAccumulator
-
-                sharedData.raceHasStarted = true
-                --initialise real distances array
-                initRealDistances()
-
-                --initial position capture
-                storeCarData()
-            end
-        end
-    end
-
-    if startDelayTime == 0 then
-        return
-    end
-
-    checkSFCrossing()
-
-    if timeAccumulator - startDelayTime > 0.3 then
-        if hasNotBeenRunThisSession("racestart") then
-            startDelayTime = timeAccumulator
-        end
-    end
-
-    --do nothing if the race start hasn't happened yet
-    if runOnceTable["racestart"] == nil then
-        return
-    end
-
-    --every frame check for jumped to pits
-    ac.perfBegin("retirecheck")
-    for i, car in ac.iterateCars.ordered() do
-        if car.justJumped then
-            retiredCars[car.index] = true
-            writeLog("RETIREMENT - " .. car:driverName() .. " - has jumped to pits")
-        end
-    end
-    ac.perfEnd("retirecheck")
-
-    --every realSplineCheckHeartbeat seconds store the current splines of the cars
-    if timeAccumulator - realDistanceCheckTime  >= realDistanceCheckHeartbeat and runOnceTable["racestart"] ~= nil then
-        realDistanceCheckTime = timeAccumulator
-        storeRealDistances()
-    end
-
-    --every stateCheckHeartbeat seconds check the race state for changes - only do this after the race start
-    if timeAccumulator - stateCheckTime  >= stateCheckHeartbeat and runOnceTable["racestart"] ~= nil then
-        stateCheckTime = timeAccumulator
-
-        --iterate the cars and check if their position has changed
-        storeCarData()
-
-    end
-
-    --#############################################################
-    --################# CAR TRACKER LOGIC END  ####################
-    --#############################################################
-
     -- Safety Car is being requested
     if scRequested then
         if not scOnTrack then
@@ -1086,46 +761,13 @@ local function initializeSSStates()
     
 end
 
---#############################################################
---################# CAR TRACKER LOGIC #########################
---#############################################################
-
-local function processSessionStart(sessionIndex)
-    timeAccumulator = 0
-    stateCheckTime = 0
-    startCheckTime = 0
-    startDelayTime = 0
-    runOnceTable = {}
-    sfCheckTime = 0
-    allCarsCrossed = false
-    hasCrossedSF={}
-    prevSplines = {}
-    prevDistances = {}
-    realDistanceCheckTime = 0
-    realDistancesTracker = {}
-    retiredCars = {}
-    sharedData.raceHasStarted = false
-
-    if ac.getSession(sessionIndex).type == ac.SessionType.Race or ac.isInReplayMode() then
-        isRace = true
-    else
-        isRace = false
-    end
-    openLogFiles()
-    writeLog("SC: Car tracker Initialized on Session Start - session type is: " .. ac.getSession(sessionIndex).type .. " session is replay: " .. tostring(ac.isInReplayMode()))
-end
---#############################################################
---################# CAR TRACKER LOGIC END #####################
---#############################################################
 
 ac.onSessionStart(function(sessionIndex, restarted)
     currentSession = ac.getSession(sessionIndex)
     initializeSSStates()
     initializeSCScript()
-    processSessionStart(sessionIndex)
     writeLog("SC: Safety Car Script Initialized on Session Start")
 end)
 
 initializeSSStates()
 initializeSCScript()
-processSessionStart(0)
