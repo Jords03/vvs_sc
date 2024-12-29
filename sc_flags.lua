@@ -74,7 +74,7 @@ local scHelperTextState = {
 -- Initialize variables
 local flagColor = rgbm.colors.gray
 local showFlags = false
-local scFlagSettings = false
+local scFlagSettings = scFlagsValues.settingsOpen
 local goGreen = false
 local scOnTrack = false
 local scEnterPits = false
@@ -203,7 +203,7 @@ local function reInitailizeVars ()
     --flagWindowPosX = ac.load("SCFlagsWindowPosX")
     --flagWindowPosY = ac.load("SCFlagsWindowPosY")
     flagWindowPos = scFlagsValues.posVec2 or vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-    scFlagSettings = scFlagsValues.settingsOpen or false
+    scFlagSettings = scFlagsValues.settingsOpen
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
     previousDriverCarState = nil
@@ -232,7 +232,8 @@ local function repositionFlags()
     flagWindowPosY = ac.load("SCFlagsWindowPosY")
     flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
 
-    ac.debug("scFlagsSettings", scFlagSettings)
+    ac.debug("SC: Flags scFlagsValues.settingsOpen", scFlagsValues.settingsOpen)
+    ac.debug("SC Flags: scFlagsValues.posVec2", scFlagsValues.posVec2)
     flagWindowPos = scFlagsValues.posVec2
     scStatusText = scState.settings
     scLeaderText = scLeaderTextState.leader
@@ -618,8 +619,6 @@ local function detectErraticAndPos(dt)
             ac.debug("SC Flags: tooFar", tooFar)
             ac.debug("SC Flags: prevState", true)
             ac.debug("SC Flags: showFlags", showFlags)
-            ac.debug("SC Flags: scFlagsSettings", scFlagsValues.settingsOpen)
-            ac.debug("SC Flags: scFlagsPos", scFlagsValues.posVec2)
         else
             ac.debug("SC Flags: prevState", false)
             scHelperText = scHelperTextState.noOvertake
@@ -714,6 +713,9 @@ function script.update(dt)
 
     -- If the Safety Car is not present, return
     if not safetyCar then return end
+
+    ac.debug("SC: Flags ZZ- posVec2: ", scFlagsValues.posVec2)
+    ac.debug("SC: Flags ZZ- Settings: ", scFlagsValues.settingsOpen)
 
     if showFlags then
 
