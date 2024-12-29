@@ -10,6 +10,13 @@ local adminCarName = "Jon Astrop"
 local adminCar = nil
 local trackLength = sim.trackLengthM
 
+--shared data structure for sc flags settings
+local scFlagsValues = ac.connect({
+    ac.StructItem.key('vvs.sc_flags_pos'),
+    posVec2 = ac.StructItem.vec2(),
+    settingsOpen = ac.StructItem.boolean()
+}, true, ac.SharedNamespace.Shared)
+
 local function getStates()
     sim = sim or ac.getSim()
     if sim then
@@ -127,8 +134,10 @@ local flagWindowPos
 local flagWindowSize = vec2(300, 180)
 local defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
 local defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
+--[[ 
 local flagWindowPosX = ac.load("SCFlagsWindowPosX")
 local flagWindowPosY = ac.load("SCFlagsWindowPosY")
+ ]]
 
 -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
 local previousDriverCarState = nil
@@ -191,8 +200,10 @@ local function reInitailizeVars ()
     flagWindowSize = vec2(300, 180)
     defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
     defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
-    flagWindowPosX = ac.load("SCFlagsWindowPosX")
-    flagWindowPosY = ac.load("SCFlagsWindowPosY")
+    --flagWindowPosX = ac.load("SCFlagsWindowPosX")
+    --flagWindowPosY = ac.load("SCFlagsWindowPosY")
+    flagWindowPos = scFlagsValues.posVec2 or vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+    scFlagSettings = scFlagsValues.settingsOpen or false
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
     previousDriverCarState = nil
@@ -202,8 +213,12 @@ local function reInitailizeVars ()
 
 end
 
-if not (flagWindowPosX and flagWindowPosY) then
+--[[ if not (flagWindowPosX and flagWindowPosY) then
     flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+end ]]
+
+if scFlagsValues.posVec2 == nil then
+    scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
 end
 
 local function writeLog(message)
@@ -212,13 +227,13 @@ local function writeLog(message)
 end
 
 
-
 local function repositionFlags()
-    flagWindowPosX = ac.load("SCFlagsWindowPosX")
+    --[[ flagWindowPosX = ac.load("SCFlagsWindowPosX")
     flagWindowPosY = ac.load("SCFlagsWindowPosY")
-    flagWindowPos = vec2(flagWindowPosX, flagWindowPosY)
+    flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
 
     ac.debug("scFlagsSettings", scFlagSettings)
+    flagWindowPos = scFlagsValues.posVec2
     scStatusText = scState.settings
     scLeaderText = scLeaderTextState.leader
     scHelperText = scHelperTextState.catchSC
@@ -603,7 +618,8 @@ local function detectErraticAndPos(dt)
             ac.debug("SC Flags: tooFar", tooFar)
             ac.debug("SC Flags: prevState", true)
             ac.debug("SC Flags: showFlags", showFlags)
-            ac.debug("SC Flags: scFlagsSettings", scFlagSettings)
+            ac.debug("SC Flags: scFlagsSettings", scFlagsValues.settingsOpen)
+            ac.debug("SC Flags: scFlagsPos", scFlagsValues.posVec2)
         else
             ac.debug("SC Flags: prevState", false)
             scHelperText = scHelperTextState.noOvertake
@@ -701,15 +717,16 @@ function script.update(dt)
 
     if showFlags then
 
+        --scFlagSettings = ac.load("scFlagsSettingsOpen") == 1
+        scFlagSettings = scFlagsValues.settingsOpen
+
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
             -- Check if all states exist; if not, re-initialize them
             if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
                 getStates()
             end
             checkStatesAccumulator = timeAccumulator
-        end
-
-        scFlagSettings = ac.load("scFlagsSettingsOpen") == 1
+        end        
 
         if safetyCar.justJumped then
             writeLog("SC: Safety Car has just jumped")
