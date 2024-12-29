@@ -490,7 +490,7 @@ local function detectErraticAndPos(dt)
         if car == raceLeaderCar then
             carAhead = safetyCar
             minDistanceAhead = distanceBehindSC
-        else
+        elseif raceLeaderCar ~= nil then
             local distanceBehindLeader = calculateDistanceBehind(car.splinePosition, raceLeaderCar.splinePosition)
             local betweenLeaderAndSafetyCar = (distanceBehindLeader >= distanceBehindSC)
             if betweenLeaderAndSafetyCar then
