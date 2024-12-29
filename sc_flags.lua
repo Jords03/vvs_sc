@@ -103,7 +103,7 @@ local timeToDisplayTextAccumulator = 0
 local timeToDisplayGreenAccumulator = 0
 
 local miniCheckInterval = 0.1
-local medCheckInterval = 2
+local medCheckInterval = 0.3
 local checkStatesInterval = 60
 local timeToDisplaySCText = 2
 local timeToDisplayGreen = 6
@@ -243,6 +243,8 @@ local function logAudioCallback(err, folder)
     scInThisLapAudio = folder .. "/sc_safetycarinthislap.wav"
     scClearAudio = folder .. "/sc_safetycariscomingin.wav"
     scGoGreenAudio = folder .. "/safety_car_green_flag.wav"
+
+    writeLog("SC: wAV folder | " .. folder)
 
     -- LOCAL FILES - NEW SOUNDS With Crewchief audio
     --scDeployedAudio = "sc_safetycarisout.wav"
