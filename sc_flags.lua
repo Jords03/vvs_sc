@@ -322,7 +322,7 @@ local function logAudioCallback(err, folder)
 end
 
 -- Call web.loadRemoteAssets with the URL and the logging callback
-web.loadRemoteAssets("https://raw.githubusercontent.com/Jords03/vvs_sc/main/sc_wav_files.zip", logAudioCallback)
+web.loadRemoteAssets("https://raw.githubusercontent.com/Jords03/vvs_sc/main/sc_wav_files_1.zip", logAudioCallback)
 
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     if not safetyCar then
