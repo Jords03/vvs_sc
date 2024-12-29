@@ -2,10 +2,12 @@
 local sim = ac.getSim()
 local currentSession = ac.getSession(sim.currentSessionIndex)
 local driverCar = ac.getCar(0)
+--XXX
 local safetyCarName = "Safety Car"
-local safetyCar
+--local safetyCarName = "VVS SafetyCar"
+local safetyCar = nil
 local adminCarName = "Jon Astrop"
-local adminCar
+local adminCar = nil
 local trackLength = sim.trackLengthM
 
 local function getStates()
@@ -17,6 +19,7 @@ local function getStates()
     if not safetyCar then
         local safetyCarID = ac.getCarByDriverName(safetyCarName)
         if safetyCarID then
+            ac.log("SC identified as:" .. safetyCarID)
             safetyCar = ac.getCar(safetyCarID)
         end
     end
@@ -33,7 +36,7 @@ local scState = {
     deployed = "DEPLOYED",
     returning = "ENDING",
     enteringPit = "CLEAR",
-    inPit = "IN PIBOX",
+    inPit = "IN PITBOX",
     getReady = "GET READY",
     off = "",
     settings = "SETTINGS"
@@ -64,24 +67,18 @@ local flagColor = rgbm.colors.gray
 local showFlags = false
 local scFlagSettings = false
 local goGreen = false
-local onTrack = false
-local enterPits = false
+local scOnTrack = false
+local scEnterPits = false
 local headingToPits = false
 local getCarLapCounts = false
 local checkGoGreen = false
 local carLapCounts = {}
-local prevSCState = ""
 local raceLeaderCar = nil
+local prevRaceLeaderCar = nil
+local leaderChangedLastBeat = false
 
 -- Leaderboard variables
-local carLeaderboard = {}
-local prevDistances = {}
-local hasCrossedSF = {}
-local prevSplines = {}
-local sfCheckHeartBeat = 1
-local sfCheckTime = 0
 local leaderCheckTime = 0
-local allCarsCrossed = false
 local carDistance = 0
 
 -- Text variables
@@ -104,24 +101,24 @@ local checkStatesAccumulator = 0
 local erraticCheckAccumulator = 0
 local timeToDisplayTextAccumulator = 0
 local timeToDisplayGreenAccumulator = 0
+
 local miniCheckInterval = 0.1
-local shortCheckInterval = 1
-local medCheckInterval = 3
+local medCheckInterval = 2
 local checkStatesInterval = 60
 local timeToDisplaySCText = 2
 local timeToDisplayGreen = 6
-local lapcount = 0
 local erraticTimer = 0
 local erraticDisplayDuration = 2
 
 -- Audio variables
 local scGoGreenAudio
+local scClearAudio
 local scInThisLapAudio
 local scDeployedAudio
+local audioSCClearEvent
 local audioSCGoGreenEvent
 local audioSCInThisLapEvent
 local audioSCDeployedEvent
-local audioLoaded = false
 
 -- Window variables
 local flagWindowPos
@@ -133,10 +130,12 @@ local flagWindowPosY = ac.load("SCFlagsWindowPosY")
 
 -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
 local previousDriverCarState = nil
-local previousSpeed = nil
 local previousHelperTextState = nil
+local previousMinus1HelpertextState = nil
 local distanceThreshold = 28
 local distanceEndingThreshold = 500
+
+
 
 -- Combined threshold values for detecting erratic behavior
 local erraticThresholds = {
@@ -150,24 +149,15 @@ local function reInitailizeVars ()
     flagColor = rgbm.colors.gray
     showFlags = false
     goGreen = false
-    onTrack = false
-    enterPits = false
+    scOnTrack = false
+    scEnterPits = false
     headingToPits = false
     getCarLapCounts = false
     checkGoGreen = false
     carLapCounts = {}
-    prevSCState = ""
     raceLeaderCar = nil
-
-    -- Leaderboard variables
-    carLeaderboard = {}
-    prevDistances = {}
-    hasCrossedSF = {}
-    prevSplines = {}
-    sfCheckHeartBeat = 1
-    sfCheckTime = 0
-    leaderCheckTime = 0
-    allCarsCrossed = false
+    prevRaceLeaderCar = nil
+    leaderChangedLastBeat = false
 
     -- Text variables
     headFontSize = 22
@@ -189,18 +179,11 @@ local function reInitailizeVars ()
     erraticCheckAccumulator = 0
     timeToDisplayTextAccumulator = 0
     timeToDisplayGreenAccumulator = 0
-    miniCheckInterval = 0.1
-    shortCheckInterval = 1
-    medCheckInterval = 2
     checkStatesInterval = 60
     timeToDisplaySCText = 2
     timeToDisplayGreen = 6
-    lapcount = 0
     erraticTimer = 0
     erraticDisplayDuration = 2
-
-    -- Audio variables
-    audioLoaded = false
 
     -- Window variables
     flagWindowSize = vec2(300, 180)
@@ -211,8 +194,8 @@ local function reInitailizeVars ()
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
     previousDriverCarState = nil
-    previousSpeed = nil
     previousHelperTextState = nil
+    previousMinus1HelpertextState = nil
     distanceThreshold = 28
 
 end
@@ -225,6 +208,8 @@ local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
     ac.log(timeStamp .. " | " .. message) -- Also log to the default writeLog
 end
+
+
 
 local function repositionFlags()
     flagWindowPosX = ac.load("SCFlagsWindowPosX")
@@ -248,12 +233,25 @@ end
 -- Define the callback function
 local function logAudioCallback(err, folder)
     
-    scDeployedAudio = folder .. "/safety_car.wav"
-    scInThisLapAudio = folder .. "/safety_car_this_lap.wav"
+    --scDeployedAudio = folder .. "/safety_car.wav"   
+    --scInThisLapAudio = folder .. "/safety_car_this_lap.wav"
+    --scClearAudio = folder .. "/safety_car_green_flag.wav"
+    --scGoGreenAudio = folder .. "/safety_car_green_flag.wav"
+
+    -- NEW SOUNDS With Crewchief audio
+    scDeployedAudio = folder .. "/sc_safetycarisout.wav"
+    scInThisLapAudio = folder .. "/sc_safetycarinthislap.wav"
+    scClearAudio = folder .. "/sc_safetycariscomingin.wav"
     scGoGreenAudio = folder .. "/safety_car_green_flag.wav"
 
+    -- LOCAL FILES - NEW SOUNDS With Crewchief audio
+    --scDeployedAudio = "sc_safetycarisout.wav"
+    --scInThisLapAudio = "sc_safetycarinthislap.wav"
+    --scClearAudio = "sc_safetycarisclear.wav"
+    --scGoGreenAudio = "safety_car_green_flag.wav"
+
+
     scDeployedAudio = {
-        --filename = 'extension/lua/online/AC_RP_SafetyCar/safety_car.wav',
         filename = scDeployedAudio,
         stream = { name = 'scDeployedStream', size = 1024 },
         use3D = false,
@@ -269,7 +267,6 @@ local function logAudioCallback(err, folder)
     }
         
     scInThisLapAudio = {
-        --filename = 'extension/lua/online/AC_RP_SafetyCar/safety_car_this_lap.wav',     -- Audio filename
         filename = scInThisLapAudio,
         stream = { name = 'scInThisLapStream', size = 1024 },
         use3D = false,
@@ -284,8 +281,23 @@ local function logAudioCallback(err, folder)
         ac.AudioDSP[ac.AudioDSP.Normalize],
     }
 
+    scClearAudio = {
+        filename = scClearAudio,
+        stream = { name = 'scClearStream', size = 1024 },
+        use3D = false,
+        useOcclusion = false,
+        loop = false,
+        insideConeAngle = 360,
+        outsideConeAngle = 360,
+        outsideVolume = 1.0,
+        minDistance = 1,
+        maxDistance = 10000,
+        dopplerEffect = 1.0,
+        ac.AudioDSP[ac.AudioDSP.Normalize],
+    }
+
+    --UNUSED NOW
     scGoGreenAudio = {
-        --filename = 'extension/lua/online/AC_RP_SafetyCar/safety_car_green_flag.wav',
         filename = scGoGreenAudio,
         stream = { name = 'scGoGreenStream', size = 1024 },
         use3D = false,
@@ -302,9 +314,9 @@ local function logAudioCallback(err, folder)
 
     audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
     audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
+    audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
     audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
 
-    audioLoaded = true
 end
 
 -- Call web.loadRemoteAssets with the URL and the logging callback
@@ -329,7 +341,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             headingToPits = false
             showFlags = true
             goGreen = false
-            onTrack = true
+            scOnTrack = true
             audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
             audioSCDeployedEvent.volume = 10
             audioSCDeployedEvent:start()
@@ -342,7 +354,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             headingToPits = true
             showFlags = true
             goGreen = false
-            onTrack = true
+            scOnTrack = true
             audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
             audioSCInThisLapEvent.volume = 10
             audioSCInThisLapEvent:start()
@@ -354,8 +366,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             scTextColor = rgbm.colors.yellow
             scLeaderText = scLeaderTextState.goAnyTime
             showFlags = true
-            enterPits = true
-            onTrack = false
+            scEnterPits = true
+            scOnTrack = false
             goGreen = false
             getCarLapCounts = true
             --checkGoGreen = true
@@ -375,62 +387,75 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     return true
 end)
 
+--XXX
+--[[
+local btnSCOn = ac.ControlButton('app.sc_flags/scon', ui.KeyIndex.A)
+    btnSCOn:onPressed(function ()
+    writeLog("SC: Recieved - Safety Car has left pits")
+    flagColor = rgbm.colors.yellow
+    scTextColor = rgbm.colors.black
+    scHeadingTextColor = rgbm.colors.yellow
+    scStatusText = scState.deployed
+    scHeadingText = scHeadingTextState.sc
+    --scLeaderText = scLeaderTextState.leader
+    headingToPits = false
+    showFlags = true
+    goGreen = false
+    scOnTrack = true
+    audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
+    audioSCDeployedEvent.volume = 10
+    audioSCDeployedEvent:start()
+  end)
 
-local function checkSFCrossing()
-    --for efficiency, once all cars are crossed then don't run this
-    if allCarsCrossed then return end
-    --on the heartbeat
-    if timeAccumulator - sfCheckTime  >= sfCheckHeartBeat then
-        local anyFalse = false
+  local btnSCPits = ac.ControlButton('app.sc_flags/scpits', ui.KeyIndex.S)
+    btnSCPits:onPressed(function ()
+    writeLog("SC: Recieved - Safety Car is heading to pits")
+    flagColor = rgbm(0.6, 0.6, 0, 1)
+    scStatusText = scState.returning
+    scTextColor = rgbm.colors.black
+    scLeaderText = scLeaderTextState.off
+    headingToPits = true
+    showFlags = true
+    goGreen = false
+    scOnTrack = true
+    audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
+    audioSCInThisLapEvent.volume = 10
+    audioSCInThisLapEvent:start()
+    timeToDisplayTextAccumulator = timeAccumulator
+  end)
 
-        --iterate the list of cars
-        for i, car in ac.iterateCars.leaderboard() do
-            --first go we will have no stored splines
-            if prevSplines[car.index] == nil then
-                prevSplines[car.index] = car.splinePosition
-            else
-                --spline has gone from 0.9x to 0.0x
-                if prevSplines[car.index] > 0.9 and car.splinePosition < 0.1 then
-                    hasCrossedSF[car.index] = true
-                end
-            end
-            --check if any are false still
-            if hasCrossedSF[car.index] == nil then
-                anyFalse = true
-            end
-        end
-        --all cars have passed the check, disable it
-        if not anyFalse then allCarsCrossed = true end
-        sfCheckTime = timeAccumulator
-    end
-end
-
-local function getLeaderboard()
-    local carPosList = {}
-    for i, car in ac.iterateCars.leaderboard() do
-        if not (car == safetyCar or car.isInPit or car.isInPitlane) then
-            carPosList[#carPosList + 1] = {car=car, racePosition=car.racePosition}
-        end
-    end
-    table.sort(carPosList, function (k1, k2) return k1.racePosition < k2.racePosition end )
-    for pos=1, #carPosList, 1 do
-        ac.debug("SC Flags: Leaderboard ".. pos .. ": ", carPosList[pos].car:driverName())
-        writeLog(carPosList[pos].car:driverName() .. " - in position " .. pos .. " | CSPpos (" .. carPosList[pos].car.racePosition .. ") - lap count " .. carPosList[pos].car.lapCount)
-    end
-    return carPosList
-end
+  local btnSCOff = ac.ControlButton('app.sc_flags/scoff', ui.KeyIndex.D)
+    btnSCOff:onPressed(function ()
+    writeLog("SC: Recieved - Safety Car is entering pit lane")
+    flagColor = rgbm(0.4, 0.4, 0.4, 1)
+    scStatusText = scState.enteringPit
+    scTextColor = rgbm.colors.yellow
+    scLeaderText = scLeaderTextState.goAnyTime
+    showFlags = true
+    scEnterPits = true
+    scOnTrack = false
+    goGreen = false
+    getCarLapCounts = true
+    --checkGoGreen = true
+    timeToDisplayTextAccumulator = timeAccumulator
+    end)
+    ]]--
 
 -- Calculate the normalized distance behind the safety car
 local function calculateDistanceBehind(carPosition, otherPosition)
-    local distance = (otherPosition - carPosition) % 1
-    return distance  -- Always a value between 0 and 1
+    if carPosition > otherPosition then
+        otherPosition = otherPosition + 1
+    end
+    return otherPosition - carPosition  -- Always a value between 0 and 1
 end
 
 -- Function to detect erratic driving behavior and check distance
 local function detectErraticAndPos(dt)
+
     local car = driverCar
 
     if car then
+
         local carAhead = nil
         local tooFar = false
         local catchSC = false
@@ -442,9 +467,11 @@ local function detectErraticAndPos(dt)
         local distanceBehindSC = calculateDistanceBehind(car.splinePosition, safetyCar.splinePosition)
         distanceToSC = distanceBehindSC * trackLength
 
+        --writeLog("Distance to SC is: " .. distanceToSC)
+
         -- Find the next car ahead on track
         local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
-        for i, otherCar in ac.iterateCars.leaderboard() do
+        for i, otherCar in ac.iterateCars.ordered() do
             if otherCar ~= safetyCar and otherCar ~= car then
                 local distanceAhead = calculateDistanceBehind(car.splinePosition, otherCar.splinePosition)
                 if distanceAhead > 0 and distanceAhead < minDistanceAhead then
@@ -453,6 +480,9 @@ local function detectErraticAndPos(dt)
                 end
             end
         end
+
+        --writeLog("Car ahead is: " .. carAhead:driverName() .. " and is " .. minDistanceAhead * trackLength .. " ahead")
+
         -- if leader then car ahead is the safety car
         if car == raceLeaderCar then
             carAhead = safetyCar
@@ -462,6 +492,7 @@ local function detectErraticAndPos(dt)
             local betweenLeaderAndSafetyCar = (distanceBehindLeader >= distanceBehindSC)
             if betweenLeaderAndSafetyCar then
                 passSafetyCar = true
+                --writeLog("Bewtween leader and safety car")
             end
         end
         -- Calculate the distance to the car ahead
@@ -469,8 +500,12 @@ local function detectErraticAndPos(dt)
             carDistance = minDistanceAhead * trackLength
             ac.debug("SC Flags: minDistanceAhead", minDistanceAhead)
             tooFar = carDistance > distanceThreshold
+            --if tooFar then
+             --   writeLog("too far")
+            --end
             if (carDistance > (distanceThreshold * 3)) then
                 catchSC = true
+                --writeLog("catch up")
             end
         end
 
@@ -512,17 +547,42 @@ local function detectErraticAndPos(dt)
             end
 
             if newHelperTextState ~= previousHelperTextState then
+                --writeLog("state change")
                 local leaderDistanceCheck = (car.splinePosition * trackLength) > (trackLength - distanceEndingThreshold)
                 if car == raceLeaderCar and leaderDistanceCheck and scStatusText == scState.returning then
                     scHelperText = scHelperTextState.off
+                    previousHelperTextState = newHelperTextState
                 else
-                    scHelperText = newHelperTextState
+                    -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
+                    if previousMinus1HelpertextState == nil then
+                        --prev minus 1 is nil so this is the first beat that we changed, if this is one that we need to sanitise then just store it
+                        if newHelperTextState == scHelperTextState.catchSC or newHelperTextState == scHelperTextState.closeGap then
+                            previousMinus1HelpertextState = newHelperTextState
+                        else
+                            --it isn't one we care about sanitising to just store prev and set this one
+                            previousHelperTextState = newHelperTextState
+                            scHelperText = newHelperTextState
+                            --writeLog("dont care: " .. scHelperText)
+                        end
+                    else -- prev minus 1 is not nil so this is a second beat to check
+                        --sanity check that we have the same result on next beat
+                        if previousMinus1HelpertextState == newHelperTextState then
+                            --we do so set the values and continue
+                            scHelperText = newHelperTextState
+                            --writeLog("do care: " .. scHelperText)
+                            previousMinus1HelpertextState = nil
+                            previousHelperTextState = newHelperTextState
+                        else
+                            --sanity check failed, this is a different condition than last time - just reset the prev minus 1 check
+                            previousMinus1HelpertextState = nil
+                        end
+                    end
                 end
-                previousHelperTextState = newHelperTextState
             end
 
             -- Debugging output
             ac.debug("SC Flags: newHelperTextState", newHelperTextState)
+            ac.debug("SC Flags: previousHelperTextState", previousHelperTextState)
             ac.debug("SC Flags: DT", dt)
             ac.debug("SC Flags: 1-Driver", car:driverName())
             ac.debug("SC Flags: 2-RaceLeaderCar", raceLeaderCar:driverName())
@@ -533,6 +593,8 @@ local function detectErraticAndPos(dt)
             ac.debug("SC Flags: erraticActive", erraticActive)
             ac.debug("SC Flags: tooFar", tooFar)
             ac.debug("SC Flags: prevState", true)
+            ac.debug("SC Flags: showFlags", showFlags)
+            ac.debug("SC Flags: scFlagsSettings", scFlagSettings)
         else
             ac.debug("SC Flags: prevState", false)
             scHelperText = scHelperTextState.off
@@ -607,7 +669,6 @@ local function uiFlags(dt)
             ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
         end
         ui.endTransparentWindow()
-
     end
 end
 
@@ -617,48 +678,84 @@ end
 
 function script.update(dt)
 
+    --accumulate total time
     timeAccumulator = timeAccumulator + dt
+    ac.debug("Time Accumulator", timeAccumulator)
 
-    scFlagSettings = ac.load("scFlagsSettingsOpen") == 1
-
-    if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
-        -- Check if all states exist; if not, re-initialize them
-        if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
-            getStates()
-        end
-        checkStatesAccumulator = timeAccumulator
+    --don't do anything for first 2 seconds
+    if timeAccumulator < 2 then
+        return
     end
 
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
-    checkSFCrossing()
-
-    if safetyCar.justJumped then
-        writeLog("SC: Safety Car has just jumped")
-        showFlags = false
-    end
-
-    ac.debug("SC Flags: driverCar", driverCar:driverName())
-    if raceLeaderCar then
-        ac.debug("SC Flags: leaderboard #1", raceLeaderCar:driverName())
-    end
-
-    --[[
-    ac.debug("SC FLags: Time Accumulator", timeAccumulator)
-    ac.debug("SC FLags: showFlags", showFlags)
-    ac.debug("SC FLags: goGreen", goGreen)
-    ac.debug("SC FLags: scState", scStatusText)
-    ac.debug("SC FLags: flagWindowPos", flagWindowPos)
-    ]]
-
     if showFlags then
 
-        if onTrack then
+        if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
+            -- Check if all states exist; if not, re-initialize them
+            if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
+                getStates()
+            end
+            checkStatesAccumulator = timeAccumulator
+        end
+
+        scFlagSettings = ac.load("scFlagsSettingsOpen") == 1
+
+        if safetyCar.justJumped then
+            writeLog("SC: Safety Car has just jumped")
+            showFlags = false
+        end
+
+        ac.debug("SC Flags: driverCar", driverCar:driverName())
+        if raceLeaderCar then
+            ac.debug("SC Flags: leaderboard #1", raceLeaderCar:driverName())
+        end
+
+        --[[
+        ac.debug("SC FLags: Time Accumulator", timeAccumulator)
+        ac.debug("SC FLags: showFlags", showFlags)
+        ac.debug("SC FLags: goGreen", goGreen)
+        ac.debug("SC FLags: scState", scStatusText)
+        ac.debug("SC FLags: flagWindowPos", flagWindowPos)
+        ]]
+
+
+        if scOnTrack then
             -- Determine the race leader
             if timeAccumulator - leaderCheckTime >= medCheckInterval then
-                carLeaderboard = getLeaderboard()
-                raceLeaderCar = carLeaderboard[1].car
+
+                local acReportedLeaderCar = ac.getCar.leaderboard(0)
+                if acReportedLeaderCar == safetyCar then
+                    acReportedLeaderCar = ac.getCar.leaderboard(1)
+                end
+                --first beat so we just have to trust it
+                if raceLeaderCar == nil then
+                    raceLeaderCar = acReportedLeaderCar
+                    --writeLog("Race leader is: " .. raceLeaderCar:driverName())
+                else
+                    --not first beat, did leader car change last beat? 
+                    if leaderChangedLastBeat == true then
+                        --it did, and is it still reporting the same leader?
+                        if prevRaceLeaderCar == acReportedLeaderCar then
+                            --it is so all good, we can trust it
+                            raceLeaderCar = acReportedLeaderCar
+                            --writeLog("Race leader is: " .. raceLeaderCar:driverName())
+                            leaderChangedLastBeat = false
+                        else
+                            --it changed again, we can't trust this
+                            prevRaceLeaderCar = acReportedLeaderCar
+                        end
+                    else
+                        --leader did not change last beat, has it changed this beat?
+                        if acReportedLeaderCar ~= raceLeaderCar then
+                            --it has, so store the current value for a beat
+                            leaderChangedLastBeat = true
+                            prevRaceLeaderCar = acReportedLeaderCar
+                        end
+                    end
+                end
+
                 if not headingToPits and driverCar == raceLeaderCar then
                     scLeaderText = scLeaderTextState.leader
                 end
@@ -671,15 +768,20 @@ function script.update(dt)
                 erraticCheckAccumulator = timeAccumulator
             end
         end
-
-        if enterPits then
+        ac.debug("SC Flags: scOnTrack", scOnTrack)
+        if scEnterPits then
             scHelperText = scHelperTextState.off
+
+            audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
+            audioSCClearEvent.volume = 5
+            audioSCClearEvent:start()
+
             if timeAccumulator - timeToDisplayTextAccumulator >= timeToDisplaySCText then
                 scStatusText = scState.off
                 flagColor = rgbm(0.3, 0.3, 0.3, 1)
                 scTextColor = rgbm(1, 0.27, 0.02, 1)
-                enterPits = false
-                onTrack = false
+                scEnterPits = false
+                scOnTrack = false
                 writeLog("SC: Status - Get Ready")
                 timeToDisplayTextAccumulator = timeAccumulator
             end
@@ -688,13 +790,13 @@ function script.update(dt)
         if goGreen then
             if timeAccumulator - timeToDisplayGreenAccumulator >= timeToDisplayGreen then
                 showFlags = false
-                onTrack = false
+                scOnTrack = false
                 goGreen = false
                 writeLog("SC: Gone green - Flags off")
                 timeToDisplayGreenAccumulator = timeAccumulator
             end
         end
-
+        --[[ 
         if getCarLapCounts then
             for i, car in ac.iterateCars.leaderboard() do
                 if car.splinePosition > safetyCar.splinePosition then
@@ -706,9 +808,32 @@ function script.update(dt)
             end
             checkGoGreen = true
             getCarLapCounts = false
+        end ]]
+
+        if getCarLapCounts then
+            carLapCounts[driverCar.index] = driverCar.lapCount or 0
+            writeLog("Got lap count: " .. driverCar.lapCount)
+            getCarLapCounts = false
+            checkGoGreen = true
         end
 
         if checkGoGreen then
+            if driverCar.lapCount > (carLapCounts[driverCar.index] or 0) then
+                writeLog("SC: Driver Car ID: " .. driverCar:driverName() .. " crossed start finish")
+                flagColor = rgbm(0, 225, 0, 1)
+                scHeadingTextColor = rgbm(0, 225, 0, 1)
+                scHeadingText = scHeadingTextState.green
+                scStatusText = scState.off
+                scLeaderText = scLeaderTextState.off
+
+                showFlags = true
+                goGreen = true
+                checkGoGreen = false
+                timeToDisplayGreenAccumulator = timeAccumulator
+            end
+        end
+
+        --[[ if checkGoGreen then
             for i, car in ac.iterateCars.leaderboard() do
                 if car == safetyCar or car.isInPitlane or car.isInPit then
                     ac.debug("SC: Car Info: ", car:driverName())
@@ -724,7 +849,7 @@ function script.update(dt)
                     goGreen = true
                     
                     audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-                    audioSCGoGreenEvent.volume = 10
+                    audioSCGoGreenEvent.volume = 5
                     audioSCGoGreenEvent:start()
 
                     checkGoGreen = false
@@ -732,7 +857,7 @@ function script.update(dt)
                     break
                 end
             end
-        end
+        end ]]
     end
 end
 
@@ -749,3 +874,5 @@ ac.onRelease(initializeSCFlagScript)
 getStates()
 reInitailizeVars()
 initializeSCFlagScript()
+
+
