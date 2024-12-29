@@ -592,7 +592,9 @@ local function detectErraticAndPos(dt)
             ac.debug("SC Flags: previousHelperTextState", previousHelperTextState)
             ac.debug("SC Flags: DT", dt)
             ac.debug("SC Flags: 1-Driver", car:driverName())
-            ac.debug("SC Flags: 2-RaceLeaderCar", raceLeaderCar:driverName())
+            if raceLeaderCar then
+                ac.debug("SC Flags: 2-RaceLeaderCar", raceLeaderCar:driverName())
+            end
             ac.debug("SC Flags: 3-distanceToSC", distanceToSC)
             ac.debug("SC Flags: 4-carDistance", carDistance)
             ac.debug("SC Flags: catchSC", catchSC)
@@ -656,11 +658,11 @@ local function uiFlags(dt)
         local scHelperTextStart = scHelperTextCenter - (scHelperTextSize / 2)
 
         ui.pushDWriteFont("RealPenalty")
-        ui.drawRectFilled(vec2(scHeadingTextBoxStart), vec2(scHeadingTextBoxEnd), scHeadingTextBG, 5,
+        ui.drawRectFilled(scHeadingTextBoxStart, scHeadingTextBoxEnd, scHeadingTextBG, 5,
             ui.CornerFlags.Top)
         ui.dwriteDrawText(scHeadingText, headFontSize, scHeadingTextStart, scHeadingTextColor)
 
-        ui.drawRectFilled(vec2(scFlagBoxStart), vec2(scFlagBoxEnd), flagColor, 5, ui.CornerFlags.Bottom)
+        ui.drawRectFilled(scFlagBoxStart, scFlagBoxEnd, flagColor, 5, ui.CornerFlags.Bottom)
         ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
         
         if driverCar ~= safetyCar then
@@ -714,7 +716,9 @@ function script.update(dt)
             showFlags = false
         end
 
-        ac.debug("SC Flags: driverCar", driverCar:driverName())
+        if driverCar then
+            ac.debug("SC Flags: driverCar", driverCar:driverName())
+        end
         if raceLeaderCar then
             ac.debug("SC Flags: leaderboard #1", raceLeaderCar:driverName())
         end
