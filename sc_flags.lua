@@ -234,26 +234,18 @@ end
 
 -- Define the callback function
 local function logAudioCallback(err, folder)
-    
-    --scDeployedAudio = folder .. "/safety_car.wav"   
-    --scInThisLapAudio = folder .. "/safety_car_this_lap.wav"
-    --scClearAudio = folder .. "/safety_car_green_flag.wav"
-    --scGoGreenAudio = folder .. "/safety_car_green_flag.wav"
 
     -- NEW SOUNDS With Crewchief audio
     scDeployedAudio = folder .. "/sc_safetycarisout.wav"
     scInThisLapAudio = folder .. "/sc_safetycarinthislap.wav"
-    scClearAudio = folder .. "/sc_safetycariscomingin.wav"
-    scGoGreenAudio = folder .. "/safety_car_green_flag.wav"
-
-    writeLog("SC: wAV folder | " .. folder)
+    scClearAudio = folder .. "/sc_safetycarisclear.wav"
+    scGoGreenAudio = folder .. "/sc_greengreengreen.wav"
 
     -- LOCAL FILES - NEW SOUNDS With Crewchief audio
     --scDeployedAudio = "sc_safetycarisout.wav"
     --scInThisLapAudio = "sc_safetycarinthislap.wav"
     --scClearAudio = "sc_safetycarisclear.wav"
-    --scGoGreenAudio = "safety_car_green_flag.wav"
-
+    --scGoGreenAudio = "sc_greengreengreen.wav"
 
     scDeployedAudio = {
         filename = scDeployedAudio,
@@ -324,7 +316,7 @@ local function logAudioCallback(err, folder)
 end
 
 -- Call web.loadRemoteAssets with the URL and the logging callback
-web.loadRemoteAssets("https://raw.githubusercontent.com/Jords03/vvs_sc/main/sc_wav_files_1.zip", logAudioCallback)
+web.loadRemoteAssets("https://raw.githubusercontent.com/Jords03/vvs_sc/main/sc_wav_files_01.zip", logAudioCallback)
 
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     if not safetyCar then
@@ -347,7 +339,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             goGreen = false
             scOnTrack = true
             audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
-            audioSCDeployedEvent.volume = 8
+            audioSCDeployedEvent.volume = 5
             audioSCDeployedEvent:start()
         elseif message == "SC: Safety Car is heading to pits" then
             writeLog("SC: Recieved - Safety Car is heading to pits")
@@ -360,7 +352,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             goGreen = false
             scOnTrack = true
             audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
-            audioSCInThisLapEvent.volume = 8
+            audioSCInThisLapEvent.volume = 5
             audioSCInThisLapEvent:start()
             timeToDisplayTextAccumulator = timeAccumulator
         elseif message == "SC: Safety Car is entering pit lane" then
@@ -837,6 +829,11 @@ function script.update(dt)
                 showFlags = true
                 goGreen = true
                 checkGoGreen = false
+
+                audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
+                audioSCGoGreenEvent.volume = 5
+                audioSCGoGreenEvent:start()
+
                 timeToDisplayGreenAccumulator = timeAccumulator
             end
         end
