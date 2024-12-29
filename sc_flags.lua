@@ -49,7 +49,7 @@ local scHeadingTextState = {
 
 local scLeaderTextState = {
     leader = "YOU ARE RACE LEADER",
-    maintain = "MAINTAIN 120 KMH",
+    maintain = "MAINTAIN 100 KMH",
     goAnyTime = "GO AT ANY TIME",
     off = ""
 }
@@ -59,6 +59,7 @@ local scHelperTextState = {
     closeGap = "TOO FAR - CLOSE GAP",
     erratic = "DON'T DRIVE ERRATICALLY",
     passSafetyCar = "PASS SAFETY CAR - CATCH PACK",
+    noOvertake = "NO OVERTAKING",
     off = ""
 }
 
@@ -345,20 +346,20 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             goGreen = false
             scOnTrack = true
             audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
-            audioSCDeployedEvent.volume = 10
+            audioSCDeployedEvent.volume = 8
             audioSCDeployedEvent:start()
         elseif message == "SC: Safety Car is heading to pits" then
             writeLog("SC: Recieved - Safety Car is heading to pits")
             flagColor = rgbm(0.6, 0.6, 0, 1)
             scStatusText = scState.returning
             scTextColor = rgbm.colors.black
-            scLeaderText = scLeaderTextState.off
+            scLeaderText = scLeaderTextState.maintain
             headingToPits = true
             showFlags = true
             goGreen = false
             scOnTrack = true
             audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
-            audioSCInThisLapEvent.volume = 10
+            audioSCInThisLapEvent.volume = 8
             audioSCInThisLapEvent:start()
             timeToDisplayTextAccumulator = timeAccumulator
         elseif message == "SC: Safety Car is entering pit lane" then
@@ -535,7 +536,7 @@ local function detectErraticAndPos(dt)
             local erraticActive = erraticTimer > 0
 
             -- Prioritize conditions
-            local newHelperTextState = scHelperTextState.off
+            local newHelperTextState = scHelperTextState.noOvertake
             
             if passSafetyCar then
                 newHelperTextState = scHelperTextState.passSafetyCar
@@ -552,7 +553,7 @@ local function detectErraticAndPos(dt)
                 --writeLog("state change")
                 local leaderDistanceCheck = (car.splinePosition * trackLength) > (trackLength - distanceEndingThreshold)
                 if car == raceLeaderCar and leaderDistanceCheck and scStatusText == scState.returning then
-                    scHelperText = scHelperTextState.off
+                    scHelperText = scHelperTextState.noOvertake
                     previousHelperTextState = newHelperTextState
                 else
                     -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
@@ -599,7 +600,7 @@ local function detectErraticAndPos(dt)
             ac.debug("SC Flags: scFlagsSettings", scFlagSettings)
         else
             ac.debug("SC Flags: prevState", false)
-            scHelperText = scHelperTextState.off
+            scHelperText = scHelperTextState.noOvertake
         end
 
         -- Update previous driver car state for the next frame

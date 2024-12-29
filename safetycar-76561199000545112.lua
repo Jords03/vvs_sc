@@ -148,7 +148,7 @@ local function setSCSpeedUpValue()
 end
 
 local function setSCRequestPit()
-    physics.setAITopSpeed(safetyCar.index, safetyCarSpeed)
+    physics.setAITopSpeed(safetyCar.index, safetyCarInSpeed)
     physics.setAIPitStopRequest(safetyCar.index, true)
 end
 
@@ -211,7 +211,7 @@ local function initializeSCScript()
     writeLog("SC: Safety Car Script Initialized")
 
     physics.setCarAutopilot(false, false)
-    scOnTrack = false
+    
     scRequested = false
     scHeadingToPit = false
 
@@ -223,7 +223,8 @@ local function initializeSCScript()
             waitingToStartBehindSC = true
             writeLog("SC: After jump to track, confirmed not in pit")
         end
-    else 
+        scOnTrack = false
+    else
         if ac.tryToTeleportToPits() then
             ac.tryToOpenRaceMenu(nil)
             ac.disableQuickMenuPitstop(true)
@@ -238,6 +239,7 @@ local function initializeSCScript()
             writeLog("SC: Teleport to pits failed. Retrying...")
             waitingToTeleport = true
         end
+        scOnTrack = true
     end
 
     -- Set track length dependent thresholds
@@ -245,7 +247,6 @@ local function initializeSCScript()
         SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
     end
     SC_CALLIN_THRESHOLD_END = SC_CALLIN_THRESHOLD_START + 0.25
-    
 end
 
 local function callSafetyCar()
@@ -707,7 +708,7 @@ local function initializeSSStates()
     safetyCarPitLaneSpeed = 60
     safetyCarInitialSpeed = 30
     safetyCarSpeed = 100 -- Speed in km/h
-    safetyCarInSpeed = 999 -- flat out
+    safetyCarInSpeed = 150 
     scLeadDistThresholdMin = 150 -- update to adjust to speed of leader
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 40 -- multiplier for distance behind SC N x carSpacing
