@@ -367,6 +367,9 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             goGreen = false
             getCarLapCounts = true
             --checkGoGreen = true
+            audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
+            audioSCClearEvent.volume = 5
+            audioSCClearEvent:start()
             timeToDisplayTextAccumulator = timeAccumulator
         elseif message == "SC: Safety Car has reset in pits" then
             writeLog("SC: Recieved - Safety Car has reset in pits")
@@ -536,7 +539,11 @@ local function detectErraticAndPos(dt)
             elseif catchSC then
                 --newHelperTextState = scHelperTextState.catchSC
                 if car == raceLeaderCar then
-                    newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
+                    if headingToPits then
+                        newHelperTextState = scHelperTextState.off
+                    else
+                        newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
+                    end
                 else
                     newHelperTextState = scHelperTextState.catchPack .. " - " .. math.floor(carDistance) .. "m"
                 end
@@ -771,10 +778,6 @@ function script.update(dt)
         ac.debug("SC Flags: scOnTrack", scOnTrack)
         if scEnterPits then
             scHelperText = scHelperTextState.off
-
-            audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
-            audioSCClearEvent.volume = 5
-            audioSCClearEvent:start()
 
             if timeAccumulator - timeToDisplayTextAccumulator >= timeToDisplaySCText then
                 scStatusText = scState.off
