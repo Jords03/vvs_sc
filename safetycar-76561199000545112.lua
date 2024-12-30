@@ -432,17 +432,15 @@ end
 local function getLeadingCarBehindSC()
     local leadingCarNotInPit = nil
     local distanceMeters = nil
+    --local sessionLeader = nil
 
     local trustableValues = sharedData.carsArray
     local activeCars = sharedData.activeCarsCount
-
-    local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
-    if sessionLeader == safetyCar then
-        sessionLeader = ac.getCar(sharedData.carsArray[2].carId)
-    end
+    
+    --[[ sessionLeader = ac.getCar(trustableValues[1].carId)
     if sessionLeader ~= nil then
         ac.debug("SC: SessionState Leader", sessionLeader:driverName())
-    end
+    end ]]
 
     for pos=1,activeCars,1 do
         local car = ac.getCar(trustableValues[pos].carId)
@@ -666,7 +664,6 @@ function script.update(dt)
                 scOnTrack = false
                 ac.sendChatMessage("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
-
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
                     underSCLapCount = lc.lapCount

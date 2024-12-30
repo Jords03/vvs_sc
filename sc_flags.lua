@@ -216,7 +216,7 @@ end
     flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
 end ]]
 
-if scFlagsValues.posVec2 == nil then
+if scFlagsValues.posVec2 == nil or vec2(0,0) then
     scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
 end
 
