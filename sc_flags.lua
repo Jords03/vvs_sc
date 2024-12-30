@@ -302,7 +302,6 @@ local function logAudioCallback(err, folder)
         ac.AudioDSP[ac.AudioDSP.Normalize],
     }
 
-    --UNUSED NOW
     scGoGreenAudio = {
         filename = scGoGreenAudio,
         stream = { name = 'scGoGreenStream', size = 1024 },
@@ -336,8 +335,25 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     if string.startsWith(message, "SC:") and (senderCarIndex == safetyCar.index or senderCarIndex == adminCar.index) then
         writeLog("SC: chatmsg: " .. message)
 
-        if message == "SC: Safety Car has left pits" then
-            writeLog("SC: Recieved - Safety Car has left pits")
+        if message == "SC: Safety Car rolling start" then
+            writeLog("SC: Recieved - Safety Car rolling start")
+            --[[ 
+            flagColor = rgbm.colors.yellow
+            scTextColor = rgbm.colors.black
+            scHeadingTextColor = rgbm.colors.yellow
+            scStatusText = scState.deployed
+            scHeadingText = scHeadingTextState.sc
+            --scLeaderText = scLeaderTextState.leader
+            headingToPits = false
+            showFlags = true
+            goGreen = false
+            scOnTrack = true
+            audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
+            audioSCDeployedEvent.volume = 5
+            audioSCDeployedEvent:start() 
+            ]]
+        elseif message == "SC: Safety Car deployed" then
+            writeLog("SC: Recieved - Safety Car deployed")
             flagColor = rgbm.colors.yellow
             scTextColor = rgbm.colors.black
             scHeadingTextColor = rgbm.colors.yellow
@@ -351,8 +367,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
             audioSCDeployedEvent.volume = 5
             audioSCDeployedEvent:start()
-        elseif message == "SC: Safety Car is heading to pits" then
-            writeLog("SC: Recieved - Safety Car is heading to pits")
+        elseif message == "SC: Safety Car in this lap" then
+            writeLog("SC: Recieved - Safety Car in this lap")
             flagColor = rgbm(0.6, 0.6, 0, 1)
             scStatusText = scState.returning
             scTextColor = rgbm.colors.black
@@ -365,8 +381,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             audioSCInThisLapEvent.volume = 5
             audioSCInThisLapEvent:start()
             timeToDisplayTextAccumulator = timeAccumulator
-        elseif message == "SC: Safety Car is entering pit lane" then
-            writeLog("SC: Recieved - Safety Car is entering pit lane")
+        elseif message == "SC: Safety Car is clear" then
+            writeLog("SC: Recieved - Safety Car is clear")
             flagColor = rgbm(0.4, 0.4, 0.4, 1)
             scStatusText = scState.enteringPit
             scTextColor = rgbm.colors.yellow
@@ -397,10 +413,10 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
 end)
 
 --XXX
---[[
+--[[ 
 local btnSCOn = ac.ControlButton('app.sc_flags/scon', ui.KeyIndex.A)
-    btnSCOn:onPressed(function ()
-    writeLog("SC: Recieved - Safety Car has left pits")
+btnSCOn:onPressed(function()
+    writeLog("SC: Recieved - Safety Car deployed")
     flagColor = rgbm.colors.yellow
     scTextColor = rgbm.colors.black
     scHeadingTextColor = rgbm.colors.yellow
@@ -412,30 +428,30 @@ local btnSCOn = ac.ControlButton('app.sc_flags/scon', ui.KeyIndex.A)
     goGreen = false
     scOnTrack = true
     audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
-    audioSCDeployedEvent.volume = 10
+    audioSCDeployedEvent.volume = 5
     audioSCDeployedEvent:start()
-  end)
+end)
 
-  local btnSCPits = ac.ControlButton('app.sc_flags/scpits', ui.KeyIndex.S)
-    btnSCPits:onPressed(function ()
-    writeLog("SC: Recieved - Safety Car is heading to pits")
+local btnSCPits = ac.ControlButton('app.sc_flags/scpits', ui.KeyIndex.S)
+btnSCPits:onPressed(function()
+    writeLog("SC: Recieved - Safety Car in this lap")
     flagColor = rgbm(0.6, 0.6, 0, 1)
     scStatusText = scState.returning
     scTextColor = rgbm.colors.black
-    scLeaderText = scLeaderTextState.off
+    scLeaderText = scLeaderTextState.maintain
     headingToPits = true
     showFlags = true
     goGreen = false
     scOnTrack = true
     audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
-    audioSCInThisLapEvent.volume = 10
+    audioSCInThisLapEvent.volume = 5
     audioSCInThisLapEvent:start()
     timeToDisplayTextAccumulator = timeAccumulator
-  end)
+end)
 
-  local btnSCOff = ac.ControlButton('app.sc_flags/scoff', ui.KeyIndex.D)
-    btnSCOff:onPressed(function ()
-    writeLog("SC: Recieved - Safety Car is entering pit lane")
+local btnSCOff = ac.ControlButton('app.sc_flags/scoff', ui.KeyIndex.D)
+btnSCOff:onPressed(function()
+    writeLog("SC: Recieved - Safety Car is clear")
     flagColor = rgbm(0.4, 0.4, 0.4, 1)
     scStatusText = scState.enteringPit
     scTextColor = rgbm.colors.yellow
@@ -446,9 +462,12 @@ local btnSCOn = ac.ControlButton('app.sc_flags/scon', ui.KeyIndex.A)
     goGreen = false
     getCarLapCounts = true
     --checkGoGreen = true
+    audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
+    audioSCClearEvent.volume = 5
+    audioSCClearEvent:start()
     timeToDisplayTextAccumulator = timeAccumulator
-    end)
-    ]]--
+end)
+ ]]
 
 -- Calculate the normalized distance behind the safety car
 local function calculateDistanceBehind(carPosition, otherPosition)
@@ -708,8 +727,7 @@ function script.update(dt)
 
     if showFlags then
 
-        --scFlagSettings = ac.load("scFlagsSettingsOpen") == 1
-        --scFlagSettings = scFlagsValues.settingsOpen
+        ac.debug("SC Flags: scOnTrack", scOnTrack)
 
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
             -- Check if all states exist; if not, re-initialize them
@@ -789,7 +807,7 @@ function script.update(dt)
                 erraticCheckAccumulator = timeAccumulator
             end
         end
-        ac.debug("SC Flags: scOnTrack", scOnTrack)
+        
         if scEnterPits then
             scHelperText = scHelperTextState.off
             if timeAccumulator - timeToDisplayTextAccumulator >= timeToDisplaySCText then

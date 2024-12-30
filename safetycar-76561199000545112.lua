@@ -279,10 +279,12 @@ local function processChatMessage(message, senderCarIndex)
             setSCRequestPit()
             setSCLights("off")
             writeLog("SC: Safety Car is manually called in")
-        elseif message == "SC: Kill Switch" then
+        elseif message == "SC kill" then
             initializeSCScript()
         elseif message == "SC start" then
             jumpSCtoStart()
+            waitingToStartBehindSC = true
+            startBehindSC = false
         end
     end
     return true
@@ -518,13 +520,14 @@ function script.update(dt)
     --TODO: needs to be triggered by race start not timer
     if waitingToStartBehindSC then
         if sim.timeToSessionStart <= 30 then
-            writeLog("SC: After delay on grid start")
+            writeLog("SC: Set SC variables 30s to race start")
             setSCValues(safetyCarSpeed)
             setSCLights("on")
             scRequested = true
             scOnTrack = true
             scInPitLane = false
             waitingToStartBehindSC = false
+            ac.sendChatMessage("SC: Safety Car rolling start")
             --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
         end
     end
@@ -543,8 +546,8 @@ function script.update(dt)
             scInPitLane = safetyCar.isInPitlane or safetyCar.isInPit
             -- Runs for a single frame when the SC leaves the pits
             if not scInPitLane and not scOnTrack then
-                writeLog("SC: Safety Car has left pits")
-                ac.sendChatMessage("SC: Safety Car has left pits")
+                writeLog("SC: Safety Car Deployed")
+                ac.sendChatMessage("SC: Safety Car Deployed")
                 scOnTrack = true
                 scInPitLane = false
                 checkClosestCarToSC = true
@@ -555,7 +558,7 @@ function script.update(dt)
     end
 
     if scManualCallin then
-        ac.sendChatMessage("SC: Safety Car is heading to pits")
+        ac.sendChatMessage("SC: Safety Car in this lap")
         scManualCallin = false
     end
 
@@ -637,14 +640,14 @@ function script.update(dt)
                     writeLog("SC: Safety Car is within threshold")
                     if canSafetyCarComeIn() then
                         scConditonsMet = true
-                        ac.sendChatMessage("SC: Safety Car is heading to pits")
+                        ac.sendChatMessage("SC: Safety Car in this lap")
                         --ac.sendChatMessage("SC: Conditions met for Safety Car to come in")
                         writeLog("SC: Conditions met for Safety Car to come in")
-                        writeLog("SC: Safety Car is heading to pits")
+                        writeLog("SC: Safety Car in this lap")
                     end
                 end
                 if scConditonsMet and scSplinePos > SC_CALLIN_THRESHOLD_END then
-                    writeLog("SC: Conditions met - set Pit Request")
+                    writeLog("SC: Conditions met - set pit request")
                     scHeadingToPit = true
                     scRequested = false
                     setSCRequestPit()
@@ -655,14 +658,14 @@ function script.update(dt)
         if scHeadingToPit and scOnTrack then
             if safetyCar.isInPitlane then
                 scOnTrack = false
-                ac.sendChatMessage("SC: Safety Car is entering pit lane")
-                writeLog("SC: Safety Car is entering pit lane")
+                ac.sendChatMessage("SC: Safety Car is clear")
+                writeLog("SC: Safety Car is clear")
 
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
                     underSCLapCount = lc.lapCount
                     checkLeaderPos = true
-                    writeLog("SC: Leader on Pit Entry" .. lc:driverName())
+                    writeLog("SC: Leader on SC clear | " .. lc:driverName())
                 end
             end
         end
@@ -698,11 +701,6 @@ function script.update(dt)
             writeLog("SC: Leader Lap Count - GO Green" .. sessionLeader.lapCount)
         end
     end
-
-    ac.debug("SC: Safety Car In Pit Lane", scInPitLane)
-    ac.debug("SC: Safety Car Requested", scRequested)
-    ac.debug("SC: Safety Car Heading to Pit", scHeadingToPit)
-    ac.debug("SC: Safety Car On Track", scOnTrack)
 
 end
 
