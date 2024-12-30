@@ -53,7 +53,7 @@ local timeHalfSec
 local timeHalfSecAccumulator
 local timeShort
 local timeShortAccumulator
---local timeAccumulator
+local timeAccumulator
 local timeMedium
 local timeMediumAccumulator
 local timeLong
@@ -561,7 +561,8 @@ function script.update(dt)
 
     -- Things we do every 10 (long) seconds
     if timeAccumulator - timeLongAccumulator >= timeLong then
-        if scActive then
+        if scActive and currentSession then
+            --TODO: check this durationMinutes
             local csDuration = currentSession.durationMinutes * 60000
             local csTime = sim.currentSessionTime
             local csMinActiveTime = csDuration * scActiveCheckStartPercentage
@@ -685,7 +686,7 @@ function script.update(dt)
 
     if checkLeaderPos then
         local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
-        if underSCLapCount < sessionLeader.lapCount then
+        if sessionLeader and underSCLapCount < sessionLeader.lapCount then
             local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
             ac.sendChatMessage("SC: Go Green | " .. timeStamp)
             checkLeaderPos = false
