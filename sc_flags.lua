@@ -495,7 +495,7 @@ local function detectErraticAndPos(dt)
 
     -- Find the next car ahead on track
     local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
-    for i, otherCar in ac.iterateCars() do
+    for i, otherCar in ac.iterateCars.ordered() do
         if otherCar ~= safetyCar and otherCar ~= car then
             local distanceAhead = calculateDistanceBehind(car.splinePosition, otherCar.splinePosition)
             if distanceAhead > 0 and distanceAhead < minDistanceAhead then
@@ -524,12 +524,9 @@ local function detectErraticAndPos(dt)
         carDistance = minDistanceAhead * trackLength
         ac.debug("SC Flags: minDistanceAhead", minDistanceAhead)
         tooFar = carDistance > distanceThreshold
-        --if tooFar then
-            --   writeLog("too far")
-        --end
-        if (carDistance > (distanceThreshold * 3)) then
+        
+        if (carDistance > (distanceThreshold * 2.5)) then
             catchSC = true
-            --writeLog("catch up")
         end
     end
 
