@@ -196,7 +196,7 @@ local function jumpSCtoStart()
     local splineAheadWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, splineAhead))
 
     local trackPosition = ac.worldCoordinateToTrackProgress(scTrackProgressWorld)
-    local worldDirection = (ac.trackProgressToWorldCoordinate(scTrackPos + 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(scTrackPos)):normalize()
+    local worldDirection = (ac.trackProgressToWorldCoordinate(splineAhead) - ac.trackProgressToWorldCoordinate(scTrackPos)):normalize()
 
     -- Set the safety car position and orientation
     --physics.setCarPosition(safetyCar.index, scTrackProgressWorld, splineAheadWorld)
