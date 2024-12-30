@@ -232,8 +232,6 @@ local function repositionFlags()
     flagWindowPosY = ac.load("SCFlagsWindowPosY")
     flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
 
-    ac.debug("SC: Flags scFlagsValues.settingsOpen", scFlagsValues.settingsOpen)
-    ac.debug("SC Flags: scFlagsValues.posVec2", scFlagsValues.posVec2)
     flagWindowPos = scFlagsValues.posVec2
 end
 
@@ -638,10 +636,6 @@ end
 
 local function uiFlags(dt)
     if showFlags or scFlagSettings then
-
-        if scFlagSettings then
-            repositionFlags()
-        end
         
         ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)
 
@@ -711,10 +705,14 @@ function script.update(dt)
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
+    if scFlagSettings then
+        repositionFlags()
+    end
+
     if showFlags then
 
         --scFlagSettings = ac.load("scFlagsSettingsOpen") == 1
-        scFlagSettings = scFlagsValues.settingsOpen
+        --scFlagSettings = scFlagsValues.settingsOpen
 
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
             -- Check if all states exist; if not, re-initialize them
