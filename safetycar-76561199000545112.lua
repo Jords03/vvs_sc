@@ -195,8 +195,12 @@ local function jumpSCtoStart()
     local scTrackProgressWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, scTrackPos))
     local splineAheadWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, splineAhead))
 
+    local trackPosition = ac.worldCoordinateToTrackProgress(scTrackProgressWorld)
+    local worldDirection = (ac.trackProgressToWorldCoordinate(scTrackPos + 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(scTrackPos)):normalize()
+
     -- Set the safety car position and orientation
-    physics.setCarPosition(safetyCar.index, scTrackProgressWorld, splineAheadWorld)
+    --physics.setCarPosition(safetyCar.index, scTrackProgressWorld, splineAheadWorld)
+    physics.setCarPosition(safetyCar.index, scTrackProgressWorld, worldDirection)
 
     --[[ 
     ac.debug("SC: Jump to", scTrackPos)
@@ -776,7 +780,7 @@ local function initializeSSStates()
     raceLeader = nil
 
     trustableSplinePostionsById = {}
-    
+
 end
 
 
