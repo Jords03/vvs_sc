@@ -235,9 +235,6 @@ local function repositionFlags()
     ac.debug("SC: Flags scFlagsValues.settingsOpen", scFlagsValues.settingsOpen)
     ac.debug("SC Flags: scFlagsValues.posVec2", scFlagsValues.posVec2)
     flagWindowPos = scFlagsValues.posVec2
-    scStatusText = scState.settings
-    scLeaderText = scLeaderTextState.leader
-    scHelperText = scHelperTextState.catchSC
 end
 
 local function initializeSCFlagScript()
@@ -713,9 +710,6 @@ function script.update(dt)
 
     -- If the Safety Car is not present, return
     if not safetyCar then return end
-
-    ac.debug("SC: Flags ZZ- posVec2: ", scFlagsValues.posVec2)
-    ac.debug("SC: Flags ZZ- Settings: ", scFlagsValues.settingsOpen)
 
     if showFlags then
 
