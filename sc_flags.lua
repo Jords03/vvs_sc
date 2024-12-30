@@ -230,7 +230,6 @@ local function repositionFlags()
     --[[ flagWindowPosX = ac.load("SCFlagsWindowPosX")
     flagWindowPosY = ac.load("SCFlagsWindowPosY")
     flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
-
     flagWindowPos = scFlagsValues.posVec2
 end
 
@@ -405,7 +404,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
         elseif string.startsWith(message, "SC: Go Green") then
             writeLog("SC: Recieved - Go Green")
             -- Unused -> we track leader on client side for accuracy
-        elseif message == "SC: Kill Switch" then
+        elseif message == "SC kill" then
             initializeSCFlagScript()
         end
     end
@@ -652,7 +651,7 @@ local function textSize(text_size, fontsize)
 end
 
 local function uiFlags(dt)
-    if showFlags or scFlagSettings then
+    if showFlags or scFlagsValues.settingsOpen then
         
         ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)
 
@@ -721,7 +720,7 @@ function script.update(dt)
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
-    if scFlagSettings then
+    if scFlagsValues.settingsOpen then
         repositionFlags()
     end
 
@@ -735,14 +734,13 @@ function script.update(dt)
                 getStates()
             end
             checkStatesAccumulator = timeAccumulator
-        end        
+        end
 
         if safetyCar.justJumped then
             writeLog("SC: Safety Car has just jumped")
             showFlags = false
         end
-
-        --[[
+        
         if driverCar then
             ac.debug("SC Flags: driverCar", driverCar:driverName())
         end
@@ -754,8 +752,7 @@ function script.update(dt)
         ac.debug("SC FLags: showFlags", showFlags)
         ac.debug("SC FLags: goGreen", goGreen)
         ac.debug("SC FLags: scState", scStatusText)
-        ac.debug("SC FLags: flagWindowPos", flagWindowPos)
-        ]]
+        ac.debug("SC FLags: flagWindowPos", flagWindowPos)  
 
 
         if scOnTrack then

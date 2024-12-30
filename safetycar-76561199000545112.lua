@@ -529,6 +529,7 @@ function script.update(dt)
             scRequested = true
             scOnTrack = true
             scInPitLane = false
+            scHeadingToPit = false
             waitingToStartBehindSC = false
             ac.sendChatMessage("SC: Safety Car rolling start")
             --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
@@ -549,8 +550,8 @@ function script.update(dt)
             scInPitLane = safetyCar.isInPitlane or safetyCar.isInPit
             -- Runs for a single frame when the SC leaves the pits
             if not scInPitLane and not scOnTrack then
-                writeLog("SC: Safety Car Deployed")
-                ac.sendChatMessage("SC: Safety Car Deployed")
+                writeLog("SC: Safety Car deployed")
+                ac.sendChatMessage("SC: Safety Car deployed")
                 scOnTrack = true
                 scInPitLane = false
                 checkClosestCarToSC = true
