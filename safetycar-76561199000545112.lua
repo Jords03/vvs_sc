@@ -686,6 +686,10 @@ function script.update(dt)
 
     if checkLeaderPos then
         local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
+        if sessionLeader == safetyCar then
+            sessionLeader = ac.getCar(sharedData.carsArray[2].carId)
+        end
+
         if sessionLeader and underSCLapCount < sessionLeader.lapCount then
             local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
             ac.sendChatMessage("SC: Go Green | " .. timeStamp)
