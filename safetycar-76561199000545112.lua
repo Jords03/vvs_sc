@@ -432,12 +432,14 @@ end
 local function getLeadingCarBehindSC()
     local leadingCarNotInPit = nil
     local distanceMeters = nil
-    local sessionLeader = nil
 
     local trustableValues = sharedData.carsArray
     local activeCars = sharedData.activeCarsCount
 
-    sessionLeader = ac.getCar(trustableValues[1].carId)
+    local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
+    if sessionLeader == safetyCar then
+        sessionLeader = ac.getCar(sharedData.carsArray[2].carId)
+    end
     if sessionLeader ~= nil then
         ac.debug("SC: SessionState Leader", sessionLeader:driverName())
     end
