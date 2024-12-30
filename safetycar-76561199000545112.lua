@@ -152,6 +152,7 @@ local function setSCRequestPit()
     physics.setAIPitStopRequest(safetyCar.index, true)
 end
 
+
 local function setSCLights(state)
     if state == "on" then
         --[[ if scOnTrack then
@@ -646,6 +647,8 @@ function script.update(dt)
                         writeLog("SC: Safety Car is within threshold")
                         if canSafetyCarComeIn() then
                             scConditonsMet = true
+                            --set this here to  make sure we don't miss the AI pit window
+                            physics.setAIPitStopRequest(safetyCar.index, true)
                             ac.sendChatMessage("SC: Safety Car in this lap")
                             --ac.sendChatMessage("SC: Conditions met for Safety Car to come in")
                             writeLog("SC: Conditions met for Safety Car to come in")
@@ -653,8 +656,8 @@ function script.update(dt)
                         end
                     end
                 end
-                if scConditonsMet and scSplinePos > SC_CALLIN_THRESHOLD_END then
-                    writeLog("SC: Conditions met - set pit request")
+                if scConditonsMet and (scSplinePos > SC_CALLIN_THRESHOLD_END or safetyCar.isInPitlane) then
+                    writeLog("SC: Conditions met - set pit in values")
                     scHeadingToPit = true
                     scRequested = false
                     setSCRequestPit()
