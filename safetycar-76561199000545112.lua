@@ -241,7 +241,6 @@ local function initializeSCScript()
             writeLog("SC: Teleport to pits failed. Retrying...")
             waitingToTeleport = true
         end
-        scOnTrack = true
     end
 
     -- Set track length dependent thresholds
@@ -306,7 +305,7 @@ local function updateCarStatuses()
     local scSplinePos = trustableSplinePostionsById[safetyCar.index]
     raceLeader = ac.getCar(sharedData.carsArray[1].carId)
     
-    for i, car in ac.iterateCars.ordered() do
+    for i, car in ac.iterateCars() do
         if car ~= safetyCar then
             -- Update pit times or retirement status
             if car.isInPit then
@@ -514,6 +513,7 @@ function script.update(dt)
             if ac.tryToStart() then
                 waitingToStart = false
                 scInPitLane = true
+                scOnTrack = false
                 writeLog("SC: Teleportation to pit and start successful")
             end
             waitingToStartTimerOn = timeAccumulator
