@@ -563,15 +563,8 @@ local function detectErraticAndPos(dt)
             newHelperTextState = scHelperTextState.passSafetyCar
         elseif catchSC then
             if car == raceLeaderCar then
-                if headingToPits then
-                    --newHelperTextState = scHelperTextState.off
-                    --testing showing km/h
-                    scLeaderText = scLeaderTextState.maintain
-                    newHelperTextState = math.floor(car.speedKmh) .. " km/h"
-                else
-                    scLeaderText = scLeaderTextState.leader
-                    newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
-                end
+                scLeaderText = scLeaderTextState.leader
+                newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
             else
                 newHelperTextState = scHelperTextState.catchPack .. " - " .. math.floor(carDistance) .. "m"
             end
@@ -585,7 +578,8 @@ local function detectErraticAndPos(dt)
             --writeLog("state change")
             local leaderDistanceCheck = (car.splinePosition * trackLength) > (trackLength - distanceEndingThreshold)
             if car == raceLeaderCar and leaderDistanceCheck and scStatusText == scState.returning then
-                scHelperText = scHelperTextState.noOvertake
+                scLeaderText = scLeaderTextState.maintain
+                scHelperText = math.floor(car.speedKmh) .. " km/h"
                 previousHelperTextState = newHelperTextState
             else
                 -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
