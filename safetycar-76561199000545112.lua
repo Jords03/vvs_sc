@@ -641,14 +641,16 @@ function script.update(dt)
         if not scHeadingToPit then
             if scOnTrack then
                 local scSplinePos = trustableSplinePostionsById[safetyCar.index]
-                if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
-                    writeLog("SC: Safety Car is within threshold")
-                    if canSafetyCarComeIn() then
-                        scConditonsMet = true
-                        ac.sendChatMessage("SC: Safety Car in this lap")
-                        --ac.sendChatMessage("SC: Conditions met for Safety Car to come in")
-                        writeLog("SC: Conditions met for Safety Car to come in")
-                        writeLog("SC: Safety Car in this lap")
+                if not scConditonsMet then
+                    if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
+                        writeLog("SC: Safety Car is within threshold")
+                        if canSafetyCarComeIn() then
+                            scConditonsMet = true
+                            ac.sendChatMessage("SC: Safety Car in this lap")
+                            --ac.sendChatMessage("SC: Conditions met for Safety Car to come in")
+                            writeLog("SC: Conditions met for Safety Car to come in")
+                            writeLog("SC: Safety Car in this lap")
+                        end
                     end
                 end
                 if scConditonsMet and scSplinePos > SC_CALLIN_THRESHOLD_END then
