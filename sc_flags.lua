@@ -22,20 +22,19 @@ local function getStates()
     if sim then
         currentSession = currentSession or ac.getSession(sim.currentSessionIndex)
     end
-    driverCar = driverCar or ac.getCar(0)
-    if not safetyCar then
-        local safetyCarID = ac.getCarByDriverName(safetyCarName)
-        if safetyCarID then
-            ac.log("SC identified as:" .. safetyCarID)
-            safetyCar = ac.getCar(safetyCarID)
-        end
+    driverCar = ac.getCar(0)
+
+    local safetyCarID = ac.getCarByDriverName(safetyCarName)
+    if safetyCarID then
+        ac.log("SC identified as:" .. safetyCarID)
+        safetyCar = ac.getCar(safetyCarID)
     end
-    if not adminCar then
-        local adminCarID = ac.getCarByDriverName(adminCarName)
-        if adminCarID then
-            adminCar = ac.getCar(adminCarID)
-        end
+
+    local adminCarID = ac.getCarByDriverName(adminCarName)
+    if adminCarID then
+        adminCar = ac.getCar(adminCarID)
     end
+
 end
 
 -- Safety Car state variables
@@ -215,7 +214,9 @@ end
 --[[ if not (flagWindowPosX and flagWindowPosY) then
     flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
 end ]]
-
+if scFlagsValues.posVec2 ~= nil then
+    ac.log("PosVector is " .. scFlagsValues.posVec2.x .. "|" .. scFlagsValues.posVec2.y )
+end
 if scFlagsValues.posVec2 == nil or vec2(0,0) then
     scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
 end
@@ -576,8 +577,7 @@ local function detectErraticAndPos(dt)
 
         if newHelperTextState ~= previousHelperTextState then
             --writeLog("state change")
-            local leaderDistanceCheck = (car.splinePosition * trackLength) > (trackLength - distanceEndingThreshold)
-            if car == raceLeaderCar and leaderDistanceCheck and scStatusText == scState.returning then
+            if car == raceLeaderCar and scStatusText == scState.returning then
                 scLeaderText = scLeaderTextState.maintain
                 scHelperText = math.floor(car.speedKmh) .. " km/h"
                 previousHelperTextState = newHelperTextState
@@ -887,7 +887,6 @@ function script.update(dt)
 end
 
 ac.onSessionStart(function(sessionIndex, restarted)
-    getStates()
     reInitailizeVars()
     initializeSCFlagScript()
     currentSession = ac.getSession(sessionIndex)
@@ -896,8 +895,5 @@ end)
 
 ac.onRelease(initializeSCFlagScript)
 
-getStates()
 reInitailizeVars()
 initializeSCFlagScript()
-
-
