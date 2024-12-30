@@ -85,9 +85,6 @@ local raceLeaderCar = nil
 local prevRaceLeaderCar = nil
 local leaderChangedLastBeat = false
 
--- Leaderboard variables
-local leaderCheckTime = 0
-
 -- Text variables
 local headFontSize = 22
 local fontsize = 28
@@ -108,6 +105,7 @@ local checkStatesAccumulator = 0
 local erraticCheckAccumulator = 0
 local timeToDisplayTextAccumulator = 0
 local timeToDisplayGreenAccumulator = 0
+local leaderCheckTime = 0
 
 local miniCheckInterval = 0.1
 local medCheckInterval = 0.3
@@ -193,6 +191,7 @@ local function reInitailizeVars ()
     timeToDisplayGreen = 6
     erraticTimer = 0
     erraticDisplayDuration = 2
+    leaderCheckTime = 0
 
     -- Window variables
     flagWindowSize = vec2(300, 180)
@@ -562,7 +561,7 @@ local function detectErraticAndPos(dt)
         
         if passSafetyCar then
             newHelperTextState = scHelperTextState.passSafetyCar
-        elseif catchSC then
+        elseif catchSC and scStatusText ~= scState.returning then
             if car == raceLeaderCar then
                 scLeaderText = scLeaderTextState.leader
                 newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
