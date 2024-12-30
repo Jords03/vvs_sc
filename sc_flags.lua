@@ -562,14 +562,14 @@ local function detectErraticAndPos(dt)
         if passSafetyCar then
             newHelperTextState = scHelperTextState.passSafetyCar
         elseif catchSC then
-            --newHelperTextState = scHelperTextState.catchSC
             if car == raceLeaderCar then
                 if headingToPits then
                     --newHelperTextState = scHelperTextState.off
                     --testing showing km/h
-                    newHelperTextState = car.speedKmh .. " km/h"
                     scLeaderText = scLeaderTextState.maintain
+                    newHelperTextState = math.floor(car.speedKmh) .. " km/h"
                 else
+                    scLeaderText = scLeaderTextState.leader
                     newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
                 end
             else
@@ -790,11 +790,6 @@ function script.update(dt)
                     end
                 end
 
-                if not headingToPits and driverCar == raceLeaderCar then
-                    scLeaderText = scLeaderTextState.leader
-                else
-                    scLeaderText = scLeaderTextState.off
-                end
                 leaderCheckTime = timeAccumulator
             end
 
