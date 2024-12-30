@@ -305,7 +305,7 @@ local function updateCarStatuses()
     local scSplinePos = trustableSplinePostionsById[safetyCar.index]
     raceLeader = ac.getCar(sharedData.carsArray[1].carId)
     
-    for i, car in ac.iterateCars() do
+    for i, car in ac.iterateCars.ordered() do
         if car ~= safetyCar then
             -- Update pit times or retirement status
             if car.isInPit then
@@ -489,9 +489,10 @@ function script.update(dt)
     ac.debug("SC: inPitLane", scInPitLane)
     ac.debug("SC: scRequested", scRequested)
     ac.debug("SC: scHeadingToPit", scHeadingToPit)
+    ac.debug("SC: checkClosestCarToSC", checkClosestCarToSC)
     ac.debug("SC: scActive", scActive)
     ac.debug("SC: Start behind SC", startBehindSC)
-    if currentSession then       
+    if currentSession then    
         ac.debug("SC: Session Duration", currentSession.durationMinutes)
     end
 
