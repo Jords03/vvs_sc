@@ -154,13 +154,15 @@ end
 
 local function setSCLights(state)
     if state == "on" then
-        if scOnTrack then
+        --[[ if scOnTrack then
             ac.setExtraSwitch(0, false)
             ac.setExtraSwitch(1, true)
         else
             ac.setExtraSwitch(0, true)
             ac.setExtraSwitch(1, false)
-        end
+        end ]]
+        ac.setExtraSwitch(0, false)
+        ac.setExtraSwitch(1, true)
     elseif state == "off" then
         ac.setExtraSwitch(0, false)
         ac.setExtraSwitch(1, false)
@@ -211,7 +213,7 @@ local function initializeSCScript()
     writeLog("SC: Safety Car Script Initialized")
 
     physics.setCarAutopilot(false, false)
-    
+
     scRequested = false
     scHeadingToPit = false
 
@@ -221,9 +223,9 @@ local function initializeSCScript()
         jumpSCtoStart()
         if not safetyCar.isInPit and not safetyCar.isInPitlane then
             waitingToStartBehindSC = true
-            writeLog("SC: After jump to track, confirmed not in pit")
+            startBehindSC = false
+            writeLog("SC: Jump to track success, confirmed not in pit area")
         end
-        scOnTrack = false
     else
         if ac.tryToTeleportToPits() then
             ac.tryToOpenRaceMenu(nil)
@@ -513,8 +515,9 @@ function script.update(dt)
         end
     end
 
+    --TODO: needs to be triggered by race start not timer
     if waitingToStartBehindSC then
-        if timeAccumulator - waitingToStartTimerOn >= 3 then
+        if sim.timeToSessionStart <= 30 then
             writeLog("SC: After delay on grid start")
             setSCValues(safetyCarSpeed)
             setSCLights("on")
@@ -523,7 +526,6 @@ function script.update(dt)
             scInPitLane = false
             waitingToStartBehindSC = false
             --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
-        waitingToStartTimerOn = timeAccumulator
         end
     end
 
@@ -634,15 +636,18 @@ function script.update(dt)
                     writeLog("SC: Safety Car is within threshold")
                     if canSafetyCarComeIn() then
                         scConditonsMet = true
-                        scHeadingToPit = true
-                        scRequested = false
-                        setSCRequestPit()
-                        setSCLights("off")
                         ac.sendChatMessage("SC: Safety Car is heading to pits")
                         --ac.sendChatMessage("SC: Conditions met for Safety Car to come in")
                         writeLog("SC: Conditions met for Safety Car to come in")
                         writeLog("SC: Safety Car is heading to pits")
                     end
+                end
+                if scConditonsMet and scSplinePos > SC_CALLIN_THRESHOLD_END then
+                    writeLog("SC: Conditions met - set Pit Request")
+                    scHeadingToPit = true
+                    scRequested = false
+                    setSCRequestPit()
+                    setSCLights("off")
                 end
             end
         end
@@ -708,7 +713,7 @@ local function initializeSSStates()
     safetyCarPitLaneSpeed = 60
     safetyCarInitialSpeed = 30
     safetyCarSpeed = 100 -- Speed in km/h
-    safetyCarInSpeed = 150 
+    safetyCarInSpeed = 180
     scLeadDistThresholdMin = 150 -- update to adjust to speed of leader
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 40 -- multiplier for distance behind SC N x carSpacing
