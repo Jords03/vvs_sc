@@ -492,6 +492,9 @@ function script.update(dt)
     ac.debug("SC: scHeadingToPit", scHeadingToPit)
     ac.debug("SC: scActive", scActive)
     ac.debug("SC: Start behind SC", startBehindSC)
+    if currentSession then       
+        ac.debug("SC: Session Duration", currentSession.durationMinutes)
+    end
 
     -- Session start sanity checks - if we are in a wait state and we have gone more than 1 second then reissue the command and reset the 1s timer
     if waitingToTeleport then
