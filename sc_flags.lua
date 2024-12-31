@@ -699,6 +699,7 @@ local function uiFlags(dt)
         ui.endTransparentWindow()
 
         if scStatusText == scState.returning then
+            ac.debug("SC Flags: Inside Spped Limt", scStatusText)
             local speedLimitSignSize = 40
             local speedLimitSignBorder = 12
             local speedSignXOffset = 125
