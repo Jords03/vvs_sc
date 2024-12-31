@@ -774,8 +774,8 @@ function script.update(dt)
                         end
                     end
                     -- Move on to the next car in the leaderboard.
-                    index = index + 1
                     acReportedLeaderCar = ac.getCar.leaderboard(index)
+                    index = index + 1
                 end
                 -- If we exited the loop with no valid leader (because acReportedLeaderCar is nil
                 -- or every non-safety-car was in pit/pitlane), fall back to the first non-safety-car found.
