@@ -76,7 +76,7 @@ local scHelperTextState = {
 local flagColor = rgbm.colors.gray
 local showFlags = false
 
-local scFlagSettings = false
+local scFlagSettings = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible()
 local goGreen = false
 local scOnTrack = false
 local scEnterPits = false
@@ -208,7 +208,7 @@ local function reInitailizeVars ()
         scFlagSettings = false
     else
         flagWindowPos = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):position()
-        scFlagSettings = ac.isWindowOpen("VVS-SC-Flags-Settings")
+        scFlagSettings = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible()
     end
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
@@ -222,7 +222,7 @@ end
 
 local function repositionFlags()
     flagWindowPos = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):position()
-    scFlagSettings = ac.isWindowOpen("VVS-SC-Flags-Settings")
+    scFlagSettings = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible()
 end
 
 local function initializeSCFlagScript()
@@ -633,7 +633,7 @@ local function textSize(text_size, fontsize)
 end
 
 local function uiFlags(dt)
-    if showFlags or ac.isWindowOpen("VVS-SC-Flags-Settings") then
+    if showFlags or ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible() then
         
         ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)
 
@@ -702,7 +702,7 @@ function script.update(dt)
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
-    if ac.isWindowOpen("VVS-SC-Flags-Settings") then
+    if ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible() then
         repositionFlags()
     end
 
