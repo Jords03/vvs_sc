@@ -226,11 +226,12 @@ end
 if scFlagsValues.posVec2 == nil or vec2(0,0) then
     scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
 end
+]]
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
     ac.log(timeStamp .. " | " .. message) -- Also log to the default writeLog
-end]]
+end
 
 
 local function repositionFlags()
