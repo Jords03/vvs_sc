@@ -36,6 +36,7 @@ local safetyCarPitLaneSpeed
 local safetyCarInitialSpeed
 local safetyCarSpeed
 local safetyCarInSpeed
+local safetyCarPitInSpeed
 local scLeadDistThresholdMin
 local distanceThresholdMeters
 local carSpacing
@@ -152,6 +153,11 @@ local function setSCRequestPit()
     physics.setAIPitStopRequest(safetyCar.index, true)
 end
 
+local function setPitInSpeed()
+    physics.setAITopSpeed(safetyCar.index, safetyCarPitInSpeed)
+    physics.setAIPitStopRequest(safetyCar.index, true)
+end
+
 
 local function setSCLights(state)
     if state == "on" then
@@ -195,8 +201,8 @@ local function jumpSCtoStart()
     local scTrackProgressWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, scTrackPos))
     local splineAheadWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, splineAhead))
 
-    local trackPosition = ac.worldCoordinateToTrackProgress(scTrackProgressWorld)
-    local worldDirection = (ac.trackProgressToWorldCoordinate(splineAhead) - ac.trackProgressToWorldCoordinate(scTrackPos)):normalize()
+    local trackProgress = ac.worldCoordinateToTrackProgress(scTrackProgressWorld)
+    local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
 
     -- Set the safety car position and orientation
     --physics.setCarPosition(safetyCar.index, scTrackProgressWorld, splineAheadWorld)
@@ -674,6 +680,8 @@ function script.update(dt)
                 scOnTrack = false
                 ac.sendChatMessage("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
+                setPitInSpeed()
+                
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
                     underSCLapCount = lc.lapCount
@@ -730,6 +738,7 @@ local function initializeSSStates()
     safetyCarInitialSpeed = 30
     safetyCarSpeed = 100 -- Speed in km/h
     safetyCarInSpeed = 180
+    safetyCarPitInSpeed = 15
     scLeadDistThresholdMin = 120 -- update to adjust to speed of leader
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 28 -- multiplier for distance behind SC N x carSpacing

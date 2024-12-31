@@ -751,7 +751,7 @@ function script.update(dt)
         ac.debug("SC Flags: scOnTrack", scOnTrack)
 
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
-            repositionFlags()
+            --repositionFlags()
             -- Check if all states exist; if not, re-initialize them
             if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
                 getStates()
@@ -775,7 +775,8 @@ function script.update(dt)
         ac.debug("SC FLags: showFlags", showFlags)
         ac.debug("SC FLags: goGreen", goGreen)
         ac.debug("SC FLags: scState", scStatusText)
-        ac.debug("SC FLags: flagWindowPos", flagWindowPos)  
+        ac.debug("SC FLags: flagWindowPos", flagWindowPos)
+        ac.debug("SC Flags: scStatusText", scStatusText)
 
 
         if scOnTrack then
