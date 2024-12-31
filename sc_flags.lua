@@ -76,7 +76,7 @@ local scHelperTextState = {
 local flagColor = rgbm.colors.gray
 local showFlags = false
 
-local scFlagSettings = ac.isWindowOpen("VVS-SC-Flags-Settings")
+local scFlagSettings = false
 local goGreen = false
 local scOnTrack = false
 local scEnterPits = false
