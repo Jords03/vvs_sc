@@ -205,13 +205,13 @@ local function reInitailizeVars ()
     flagWindowSize = vec2(300, 180)
     defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
     defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
-    --flagWindowPosX = ac.load("SCFlagsWindowPosX")
-    --flagWindowPosY = ac.load("SCFlagsWindowPosY")
-    if scFlagsValues.posVec2 == vec2(0.0) or nil then
+    
+    --[[ if scFlagsValues.posVec2 == vec2(0.0) or nil then
         scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
     else
         flagWindowPos = scFlagsValues.posVec2
-    end
+    end ]]
+    flagWindowPos = scFlagsValues.posVec2
     scFlagSettings = scFlagsValues.settingsOpen
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
@@ -230,14 +230,13 @@ end
 
 
 local function repositionFlags()
-    --[[ flagWindowPosX = ac.load("SCFlagsWindowPosX")
-    flagWindowPosY = ac.load("SCFlagsWindowPosY")
-    flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
+    --[[ 
     if scFlagsValues.posVec2 == vec2(0.0) or nil then
         scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
     else
         flagWindowPos = scFlagsValues.posVec2
-    end
+    end ]]
+    flagWindowPos = scFlagsValues.posVec2
 end
 
 local function initializeSCFlagScript()
@@ -245,7 +244,7 @@ local function initializeSCFlagScript()
     showFlags = false
     goGreen = false
     getStates()
-    repositionFlags()
+    --repositionFlags()
 end
 
 
@@ -753,7 +752,7 @@ function script.update(dt)
         ac.debug("SC Flags: scOnTrack", scOnTrack)
 
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
-            --repositionFlags()
+            repositionFlags()
             -- Check if all states exist; if not, re-initialize them
             if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
                 getStates()
