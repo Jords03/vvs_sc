@@ -62,7 +62,7 @@ local scRollingTextState = {
 
 local scLeaderTextState = {
     leader = "YOU ARE RACE LEADER",
-    maintain = "MAINTAIN 100 KMH",
+    maintain = "MAINTAIN YOUR SPEED",
     goAnyTime = "GO AT ANY TIME",
     off = ""
 }
@@ -697,6 +697,30 @@ local function uiFlags(dt)
             ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
         end
         ui.endTransparentWindow()
+
+        if scStatusText == scState.returning then
+            local speedLimitSignSize = 40
+            local speedLimitSignBorder = 12
+            local speedSignXOffset = 125
+            local speedLimitSignStart = vec2(speedLimitSignSize + speedLimitSignBorder / 2, speedLimitSignSize + speedLimitSignBorder / 2)
+            local speedLimitSignBoxSize = speedLimitSignStart * 2 + vec2(speedLimitSignBorder / 2, speedLimitSignBorder / 2)
+            local speedLimitSignPosLeft = vec2(ui.windowPos().x - speedSignXOffset, ui.windowPos().y + scFlagBoxCenter.y - speedLimitSignSize)
+            local speedLimitSignPosRight = vec2(ui.windowPos().x + ui.availableSpaceX() + speedSignXOffset - speedLimitSignStart.x*2, ui.windowPos().y + scFlagBoxCenter.y - speedLimitSignSize)
+            local speedLimit = "100"
+            local speedLimitFontSize = 32
+
+            ui.beginTransparentWindow("SC Flags SpeedLimit Left", speedLimitSignPosLeft, speedLimitSignBoxSize, true, false)
+            ui.drawCircle(speedLimitSignStart, speedLimitSignSize, rgbm(1, 0, 0, 1), 48, 12)
+            ui.drawCircleFilled(speedLimitSignStart, speedLimitSignSize, rgbm(1, 1, 1, 1), 48)
+            ui.dwriteTextAligned(speedLimit, speedLimitFontSize, ui.Alignment.Center, ui.Alignment.Center, speedLimitSignBoxSize, false, rgbm(0, 0, 0, 1))
+            ui.endTransparentWindow()
+
+            ui.beginTransparentWindow("SC Flags SpeedLimit Right", speedLimitSignPosRight, speedLimitSignBoxSize, true, false)
+            ui.drawCircle(speedLimitSignStart, speedLimitSignSize, rgbm(1, 0, 0, 1), 48, 12)
+            ui.drawCircleFilled(speedLimitSignStart, speedLimitSignSize, rgbm(1, 1, 1, 1), 48)
+            ui.dwriteTextAligned(speedLimit, speedLimitFontSize, ui.Alignment.Center, ui.Alignment.Center, speedLimitSignBoxSize, false, rgbm(0, 0, 0, 1))
+            ui.endTransparentWindow()
+        end
     end
 end
 
