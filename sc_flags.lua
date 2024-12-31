@@ -137,6 +137,7 @@ local flagWindowPos
 local flagWindowSize = vec2(300, 180)
 local defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
 local defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
+
 --[[ 
 local flagWindowPosX = ac.load("SCFlagsWindowPosX")
 local flagWindowPosY = ac.load("SCFlagsWindowPosY")
@@ -206,7 +207,11 @@ local function reInitailizeVars ()
     defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
     --flagWindowPosX = ac.load("SCFlagsWindowPosX")
     --flagWindowPosY = ac.load("SCFlagsWindowPosY")
-    flagWindowPos = scFlagsValues.posVec2 or vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+    if scFlagsValues.posVec2 == vec2(0.0) or nil then
+        scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+    else
+        flagWindowPos = scFlagsValues.posVec2
+    end
     scFlagSettings = scFlagsValues.settingsOpen
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
@@ -217,16 +222,6 @@ local function reInitailizeVars ()
 
 end
 
---[[ if not (flagWindowPosX and flagWindowPosY) then
-    flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-end 
-if scFlagsValues.posVec2 ~= nil then
-    ac.log("PosVector is " .. scFlagsValues.posVec2.x .. "|" .. scFlagsValues.posVec2.y )
-end
-if scFlagsValues.posVec2 == nil or vec2(0,0) then
-    scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-end
-]]
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
@@ -238,7 +233,11 @@ local function repositionFlags()
     --[[ flagWindowPosX = ac.load("SCFlagsWindowPosX")
     flagWindowPosY = ac.load("SCFlagsWindowPosY")
     flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
-    flagWindowPos = scFlagsValues.posVec2
+    if scFlagsValues.posVec2 == vec2(0.0) or nil then
+        scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+    else
+        flagWindowPos = scFlagsValues.posVec2
+    end
 end
 
 local function initializeSCFlagScript()
@@ -246,6 +245,7 @@ local function initializeSCFlagScript()
     showFlags = false
     goGreen = false
     getStates()
+    repositionFlags()
 end
 
 
@@ -704,6 +704,7 @@ local function uiFlags(dt)
             local speedLimitSignBorder = 12
             local speedSignXOffset = 125
             local speedLimitSignStart = vec2(speedLimitSignSize + speedLimitSignBorder / 2, speedLimitSignSize + speedLimitSignBorder / 2)
+            speedLimitSignStart = speedLimitSignStart + flagWindowPos
             local speedLimitSignBoxSize = speedLimitSignStart * 2 + vec2(speedLimitSignBorder / 2, speedLimitSignBorder / 2)
             local speedLimitSignPosLeft = vec2(ui.windowPos().x - speedSignXOffset, ui.windowPos().y + scFlagBoxCenter.y - speedLimitSignSize)
             local speedLimitSignPosRight = vec2(ui.windowPos().x + ui.availableSpaceX() + speedSignXOffset - speedLimitSignStart.x*2, ui.windowPos().y + scFlagBoxCenter.y - speedLimitSignSize)
@@ -875,7 +876,7 @@ function script.update(dt)
                 timeToDisplayGreenAccumulator = timeAccumulator
             end
         end
-        
+        --[[ 
         --######################
         -- Go green individually
         if getCarLapCounts then
@@ -907,8 +908,9 @@ function script.update(dt)
         end
         -- Go green individually end
         --######################
+        ]]
 
-        --[[ 
+        
         --######################
         -- Go green same time
         if getCarLapCounts then
@@ -946,7 +948,6 @@ function script.update(dt)
         end
         -- Go green same time end
         --######################
-        ]]
     end
 end
 

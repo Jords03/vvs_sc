@@ -681,7 +681,7 @@ function script.update(dt)
                 ac.sendChatMessage("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
                 setPitInSpeed()
-                
+
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
                     underSCLapCount = lc.lapCount
@@ -775,7 +775,7 @@ local function initializeSSStates()
     -- Check Thresholds
     scDisableWithLapsToGo = 2
     SC_CALLIN_THRESHOLD_START = 0.5
-    SC_CALLIN_THRESHOLD_END = 0.8
+    SC_CALLIN_THRESHOLD_END = 0.75
 
     -- Base state variables
     scInPitLane = true
