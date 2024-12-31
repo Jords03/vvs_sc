@@ -10,8 +10,6 @@ local adminCarName = "Jon Astrop"
 local adminCar = nil
 local trackLength = sim.trackLengthM
 
-local settingsAppExists = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings") ~= nil
-
 local function getStates()
     sim = sim or ac.getSim()
     if sim then
@@ -76,7 +74,7 @@ local scHelperTextState = {
 local flagColor = rgbm.colors.gray
 local showFlags = false
 
-local scFlagSettings = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible()
+local scFlagSettings = false
 local goGreen = false
 local scOnTrack = false
 local scEnterPits = false
@@ -203,12 +201,15 @@ local function reInitailizeVars ()
     --flagWindowPosX = ac.load("SCFlagsWindowPosX")
     --flagWindowPosY = ac.load("SCFlagsWindowPosY")
 
-    if not settingsAppExists then
+    local settingsAppAccessor = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings")
+    ac.debug("App Windows", ac.getAppWindows())
+
+    if settingsAppAccessor == nil then
         flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
         scFlagSettings = false
     else
-        flagWindowPos = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):position()
-        scFlagSettings = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible()
+        flagWindowPos = settingsAppAccessor:position()
+        scFlagSettings = settingsAppAccessor:visible()
     end
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
