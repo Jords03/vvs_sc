@@ -10,6 +10,13 @@ local adminCarName = "Jon Astrop"
 local adminCar = nil
 local trackLength = sim.trackLengthM
 
+--shared data structure for sc flags settings
+local scFlagsValues = ac.connect({
+    ac.StructItem.key('vvs.sc_flags_pos'),
+    posVec2 = ac.StructItem.vec2(),
+    settingsOpen = ac.StructItem.boolean()
+}, true, ac.SharedNamespace.Shared)
+
 local function getStates()
     sim = sim or ac.getSim()
     if sim then
@@ -73,8 +80,7 @@ local scHelperTextState = {
 -- Initialize variables
 local flagColor = rgbm.colors.gray
 local showFlags = false
-
-local scFlagSettings = false
+local scFlagSettings = scFlagsValues.settingsOpen
 local goGreen = false
 local scOnTrack = false
 local scEnterPits = false
@@ -200,17 +206,8 @@ local function reInitailizeVars ()
     defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
     --flagWindowPosX = ac.load("SCFlagsWindowPosX")
     --flagWindowPosY = ac.load("SCFlagsWindowPosY")
-
-    local settingsAppAccessor = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings")
-    ac.debug("App Windows", ac.getAppWindows())
-
-    if settingsAppAccessor == nil then
-        flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-        scFlagSettings = false
-    else
-        flagWindowPos = settingsAppAccessor:position()
-        scFlagSettings = settingsAppAccessor:visible()
-    end
+    flagWindowPos = scFlagsValues.posVec2 or vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+    scFlagSettings = scFlagsValues.settingsOpen
 
     -- Data storage for tracking the previous state of the driver car (to detect erratic behavior)
     previousDriverCarState = nil
@@ -220,10 +217,27 @@ local function reInitailizeVars ()
 
 end
 
+--[[ if not (flagWindowPosX and flagWindowPosY) then
+    flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+end 
+if scFlagsValues.posVec2 ~= nil then
+    ac.log("PosVector is " .. scFlagsValues.posVec2.x .. "|" .. scFlagsValues.posVec2.y )
+end
+if scFlagsValues.posVec2 == nil or vec2(0,0) then
+    scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+end
+
+local function writeLog(message)
+    local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
+    ac.log(timeStamp .. " | " .. message) -- Also log to the default writeLog
+end]]
+
 
 local function repositionFlags()
-    flagWindowPos = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):position()
-    scFlagSettings = ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible()
+    --[[ flagWindowPosX = ac.load("SCFlagsWindowPosX")
+    flagWindowPosY = ac.load("SCFlagsWindowPosY")
+    flagWindowPos = vec2(tonumber(flagWindowPosX), tonumber(flagWindowPosY)) ]]
+    flagWindowPos = scFlagsValues.posVec2
 end
 
 local function initializeSCFlagScript()
@@ -634,7 +648,7 @@ local function textSize(text_size, fontsize)
 end
 
 local function uiFlags(dt)
-    if showFlags or ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible() then
+    if showFlags or scFlagsValues.settingsOpen then
         
         ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)
 
@@ -703,7 +717,7 @@ function script.update(dt)
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
-    if ac.accessAppWindow("IMGUI_LUA_VVS SC Flags_VVS-SC-Flags-Settings"):visible() then
+    if scFlagsValues.settingsOpen then
         repositionFlags()
     end
 
@@ -712,6 +726,7 @@ function script.update(dt)
         ac.debug("SC Flags: scOnTrack", scOnTrack)
 
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
+            repositionFlags()
             -- Check if all states exist; if not, re-initialize them
             if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
                 getStates()
