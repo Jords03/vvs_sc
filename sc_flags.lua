@@ -44,6 +44,7 @@ local scState = {
     enteringPit = "CLEAR",
     inPit = "IN PITBOX",
     getReady = "GET READY",
+    rollingStart = "ROLLING START",
     off = "",
     settings = "SETTINGS"
 }
@@ -51,6 +52,12 @@ local scState = {
 local scHeadingTextState = {
     sc = "SAFETY CAR",
     green = "GREEN FLAG"
+}
+
+local scRollingTextState = {
+    start = "FOLLOW IN SINGLE FILE",
+    ending = "WATCH FOR GREEN FLAG",
+    off = ""
 }
 
 local scLeaderTextState = {
@@ -212,7 +219,7 @@ end
 
 --[[ if not (flagWindowPosX and flagWindowPosY) then
     flagWindowPos = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-end ]]
+end 
 if scFlagsValues.posVec2 ~= nil then
     ac.log("PosVector is " .. scFlagsValues.posVec2.x .. "|" .. scFlagsValues.posVec2.y )
 end
@@ -223,7 +230,7 @@ end
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
     ac.log(timeStamp .. " | " .. message) -- Also log to the default writeLog
-end
+end]]
 
 
 local function repositionFlags()
@@ -496,7 +503,7 @@ local function detectErraticAndPos(dt)
     -- Find the next car ahead on track
     local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
     for i, otherCar in ac.iterateCars.ordered() do
-        if otherCar ~= safetyCar and otherCar ~= car then
+        if otherCar ~= safetyCar and otherCar ~= car and otherCar.isConnected and not (otherCar.isInPitlane or otherCar.isInPit) then
             local distanceAhead = calculateDistanceBehind(car.splinePosition, otherCar.splinePosition)
             if distanceAhead > 0 and distanceAhead < minDistanceAhead then
                 minDistanceAhead = distanceAhead
@@ -719,6 +726,7 @@ function script.update(dt)
         ac.debug("SC Flags: scOnTrack", scOnTrack)
 
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
+            repositionFlags()
             -- Check if all states exist; if not, re-initialize them
             if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
                 getStates()
@@ -749,10 +757,37 @@ function script.update(dt)
             -- Determine the race leader
             if timeAccumulator - leaderCheckTime >= medCheckInterval then
                 
+                -- TODO: Check performance of this while loop
+                local index = 1
+                local acReportedLeaderCar = ac.getCar.leaderboard(index)
+                local fallbackCar = nil  -- will store the first non-safety-car we find
+
+                while acReportedLeaderCar ~= nil do
+                    if acReportedLeaderCar ~= safetyCar then
+                        if fallbackCar == nil then
+                            fallbackCar = acReportedLeaderCar
+                        end
+                        -- If it is not in the pit lane, then it’s our leader.
+                        if not (acReportedLeaderCar.isInPit or acReportedLeaderCar.isInPitlane) then
+                            break
+                        end
+                    end
+                    -- Move on to the next car in the leaderboard.
+                    index = index + 1
+                    acReportedLeaderCar = ac.getCar.leaderboard(index)
+                end
+                -- If we exited the loop with no valid leader (because acReportedLeaderCar is nil
+                -- or every non-safety-car was in pit/pitlane), fall back to the first non-safety-car found.
+                if acReportedLeaderCar == nil then
+                    acReportedLeaderCar = fallbackCar
+                end
+
+                --[[ 
                 local acReportedLeaderCar = ac.getCar.leaderboard(0)
                 if acReportedLeaderCar == safetyCar then
                     acReportedLeaderCar = ac.getCar.leaderboard(1)
-                end
+                end 
+                ]]
                 --first beat so we just have to trust it
                 if raceLeaderCar == nil then
                     raceLeaderCar = acReportedLeaderCar
@@ -812,20 +847,9 @@ function script.update(dt)
                 timeToDisplayGreenAccumulator = timeAccumulator
             end
         end
-        --[[ 
-        if getCarLapCounts then
-            for i, car in ac.iterateCars.leaderboard() do
-                if car.splinePosition > safetyCar.splinePosition then
-                    carLapCounts[car.index] = 9999
-                else
-                    carLapCounts[car.index] = car.lapCount or 0
-                end
-                writeLog("SC: Car ID: " .. car.index .. " on lap " .. car.lapCount)
-            end
-            checkGoGreen = true
-            getCarLapCounts = false
-        end ]]
-
+        
+        --######################
+        -- Go green individually
         if getCarLapCounts then
             carLapCounts[driverCar.index] = driverCar.lapCount or 0
             writeLog("Got lap count: " .. driverCar.lapCount)
@@ -853,32 +877,48 @@ function script.update(dt)
                 timeToDisplayGreenAccumulator = timeAccumulator
             end
         end
+        -- Go green individually end
+        --######################
 
-        --[[ if checkGoGreen then
+        --[[ 
+        --######################
+        -- Go green same time
+        if getCarLapCounts then
             for i, car in ac.iterateCars.leaderboard() do
-                if car == safetyCar or car.isInPitlane or car.isInPit then
-                    ac.debug("SC: Car Info: ", car:driverName())
-                elseif car.lapCount > carLapCounts[car.index] then
-                    writeLog("SC: Car ID: " .. car:driverName() .. " crossed start finish")
-                    flagColor = rgbm(0,225,0,1)
-                    scHeadingTextColor = rgbm(0,225,0,1)
-                    scHeadingText = scHeadingTextState.green
-                    scStatusText = scState.off
-                    scLeaderText = scLeaderTextState.off
-
-                    showFlags = true
-                    goGreen = true
-                    
-                    audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-                    audioSCGoGreenEvent.volume = 5
-                    audioSCGoGreenEvent:start()
-
-                    checkGoGreen = false
-                    timeToDisplayGreenAccumulator = timeAccumulator
-                    break
+                if car.splinePosition > safetyCar.splinePosition then
+                    carLapCounts[car.index] = 9999
+                else
+                    carLapCounts[car.index] = car.lapCount or 0
                 end
+                writeLog("SC: Car ID: " .. car.index .. " on lap " .. car.lapCount)
             end
-        end ]]
+            checkGoGreen = true
+            getCarLapCounts = false
+        end
+
+        if checkGoGreen then
+            if raceLeaderCar ~=nil and raceLeaderCar.lapCount > carLapCounts[raceLeaderCar.index] then
+                writeLog("SC: Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
+                flagColor = rgbm(0,225,0,1)
+                scHeadingTextColor = rgbm(0,225,0,1)
+                scHeadingText = scHeadingTextState.green
+                scStatusText = scState.off
+                scLeaderText = scLeaderTextState.off
+
+                showFlags = true
+                goGreen = true
+                
+                audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
+                audioSCGoGreenEvent.volume = 5
+                audioSCGoGreenEvent:start()
+
+                checkGoGreen = false
+                timeToDisplayGreenAccumulator = timeAccumulator
+            end
+        end
+        -- Go green same time end
+        --######################
+        ]]
     end
 end
 
