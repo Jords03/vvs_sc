@@ -5,7 +5,7 @@ SCRIPT_VERSION = "0.0.0.1"
 SCRIPT_VERSION_CODE = 00001
 
 -- Edit this on per event basis?
-local startBehindSC = false
+local startBehindSC = true
 -- Initialize rolling start boolean
 local rollingStart = startBehindSC
 
@@ -306,7 +306,7 @@ local function processChatMessage(message, senderCarIndex)
             writeLog("SC: Safety Car is manually called in")
         elseif message == "SC kill" then
             initializeSCScript()
-        elseif message == "SC start" then
+        elseif message == "SC rolling" then
             jumpSCtoStart()
             rollingStart = true
             waitingToRollingStart = true
