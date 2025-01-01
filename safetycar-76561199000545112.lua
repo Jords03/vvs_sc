@@ -4,12 +4,16 @@ SCRIPT_SHORT_NAME = "VVSSC"
 SCRIPT_VERSION = "0.0.0.1"
 SCRIPT_VERSION_CODE = 00001
 
+-- Edit this on per event basis?
+local startBehindSC = true
+-- Initialize rolling start boolean
+local rollingStart = startBehindSC
+
 -- Get states
 local sim = ac.getSim()
 local currentSession = ac.getSession(sim.currentSessionIndex)
 local safetyCarName = "Safety Car"
 local adminName = "Jon Astrop"
-local startBehindSC = false
 
 --shared data structure for real car data
 local sharedData = ac.connect({
@@ -63,7 +67,7 @@ local timeLongAccumulator
 -- Session start variables
 local waitingToStartTimerOn
 local waitingToStart
-local waitingToStartBehindSC
+local waitingTorollingStart
 local waitingToTeleport
 local scActive
 local scActiveTime
@@ -177,7 +181,7 @@ local function setSCLights(state)
 end
 
 local function jumpSCtoStart()
-    local scMetersAhead = 20
+    local scMetersAhead = 25
     local scTrackPos = scMetersAhead / sim.trackLengthM
     local splineAhead = (scMetersAhead + 1) / sim.trackLengthM
 
@@ -230,11 +234,10 @@ local function initializeSCScript()
 
     getAdminCar()
 
-    if startBehindSC then
+    if rollingStart then
         jumpSCtoStart()
-        if not safetyCar.isInPit and not safetyCar.isInPitlane then
-            waitingToStartBehindSC = true
-            startBehindSC = false
+        if not (safetyCar.isInPit and safetyCar.isInPitlane) then
+            waitingTorollingStart = true
             writeLog("SC: Jump to track success, confirmed not in pit area")
         end
     else
@@ -293,8 +296,8 @@ local function processChatMessage(message, senderCarIndex)
             initializeSCScript()
         elseif message == "SC start" then
             jumpSCtoStart()
-            waitingToStartBehindSC = true
-            startBehindSC = false
+            rollingStart = true
+            waitingTorollingStart = true
         end
     end
     return true
@@ -504,7 +507,7 @@ function script.update(dt)
     ac.debug("SC: scHeadingToPit", scHeadingToPit)
     ac.debug("SC: checkClosestCarToSC", checkClosestCarToSC)
     ac.debug("SC: scActive", scActive)
-    ac.debug("SC: Start behind SC", startBehindSC)
+    ac.debug("SC: Start behind SC", rollingStart)
     if currentSession then    
         ac.debug("SC: Session Duration", currentSession.durationMinutes)
     end
@@ -535,7 +538,7 @@ function script.update(dt)
     end
 
     --TODO: needs to be triggered by race start not timer
-    if waitingToStartBehindSC then
+    if waitingTorollingStart then
         if sim.timeToSessionStart <= 30 then
             writeLog("SC: Set SC variables 30s to race start")
             setSCValues(safetyCarSpeed)
@@ -544,7 +547,7 @@ function script.update(dt)
             scOnTrack = true
             scInPitLane = false
             scHeadingToPit = false
-            waitingToStartBehindSC = false
+            waitingTorollingStart = false
             ac.sendChatMessage("SC: Safety Car rolling start")
             --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
         end
@@ -620,7 +623,7 @@ function script.update(dt)
         -- Checks for retired cars and stragglers
         if scOnTrack then
             updateCarStatuses()
-            -- Send car to pits after about 5 sec after annoucement
+            -- SC conditions met, wait +- 5 seconds before heading to pits
             if scConditonsMet and not scHeadingToPit then
                 scHeadingToPit = true
                 scRequested = false
@@ -664,11 +667,13 @@ function script.update(dt)
                 local scSplinePos = trustableSplinePostionsById[safetyCar.index]
                 if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
                     ac.debug("SC: Safety Car within threshold", true)
-                    if canSafetyCarComeIn() then
+                    if canSafetyCarComeIn() or rollingStart then
                         scConditonsMet = true
+                        rollingStart = false
                         ac.sendChatMessage("SC: Safety Car in this lap")
                         writeLog("SC: Conditions met for Safety Car to come in")
                         writeLog("SC: Safety Car in this lap")
+                        -- See med timer for call in 
                     end
                 else
                     ac.debug("SC: Safety Car within threshold", false)
@@ -762,9 +767,10 @@ local function initializeSSStates()
     timeLongAccumulator = 0
 
     -- Session start variables
+    rollingStart = startBehindSC
     waitingToStartTimerOn = 0
     waitingToStart = false
-    waitingToStartBehindSC = false
+    waitingTorollingStart = false
     waitingToTeleport = false
     scActive = true
     scActiveTime = 0
