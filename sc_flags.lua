@@ -78,6 +78,7 @@ local raceLeaderCar = nil
 local prevRaceLeaderCar = nil
 local leaderChangedLastBeat = false
 local driverCarSpeed = 0
+local rollingStartPenalties = {}
 
 -- Text variables
 local speedLimit = 100
@@ -187,6 +188,7 @@ local function reInitailizeVars ()
     prevRaceLeaderCar = nil
     leaderChangedLastBeat = false
     driverCarSpeed = 0
+    rollingStartPenalties = {}
 
     -- Text variables
     scHeadingText = scHeadingTextState.sc
@@ -453,6 +455,11 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 initializeSCFlagScript()
             end
         end
+    end
+    if string.startsWith(message, "SC: INFO") then
+        table.insert(rollingStartPenalties, message)
+
+        ac.log("SC: Info message: " .. message)
     end
     return true
 end)
@@ -858,6 +865,21 @@ local function uiFlags(dt)
                 end
                 ui.endTransparentWindow()
             end
+
+            --TODO: unfinished
+            -- Penalties Display
+            --[[ local penaltyStartPos = vec2(flagWindowPos.x + 700, flagWindowPos.y)
+            local penaltyBoxSize = vec2(300, 300)
+            local penaltyFontSize = 16
+            local lineSpacing = 15
+            ui.pushDWriteFont("RealPenalty")
+            ui.beginTransparentWindow("SC Flags Penalties", penaltyStartPos, penaltyBoxSize, true, false)
+            for i, penaltyMessage in ipairs(rollingStartPenalties) do
+                local posOffset = vec2(0, (i - 1) * lineSpacing) -- Calculate position for each line
+                ui.dwriteDrawText(penaltyMessage, penaltyFontSize, posOffset, rgbm(1, 0, 0, 1)) -- Display penalty in red color
+            end
+            ui.endTransparentWindow() ]]
+            -- Penalties Display End
         end
         
         ui.endTransparentWindow()
@@ -1082,17 +1104,16 @@ function script.update(dt)
                 if rollingStart then
                     -- Penalize speeding
                     --TODO: Add UI text element
-                    local driverSpeed = math.floor(driverCar.speedKmh)
                     local penalty = 0
-                    if driverSpeed > 160 then penalty = 180
-                    elseif driverSpeed > 140 then penalty = 60
-                    elseif driverSpeed > 120 then penalty = 45
-                    elseif driverSpeed > 110 then penalty = 15
-                    elseif driverSpeed > 102 then penalty = 5
+                    if driverCarSpeed > 160 then penalty = 180
+                    elseif driverCarSpeed > 140 then penalty = 60
+                    elseif driverCarSpeed > 120 then penalty = 45
+                    elseif driverCarSpeed > 110 then penalty = 15
+                    elseif driverCarSpeed > 102 then penalty = 5
                     end
                     if penalty > 0 then
-                        ac.sendChatMessage("SC: PENALTY + " .. penalty .. " seconds")
-                        writeLog("SC: PENALTY + " .. penalty .. " seconds")
+                        ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
+                        writeLog("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
                     end
                 end
 
