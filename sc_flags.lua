@@ -764,7 +764,7 @@ local function uiFlags(dt)
                 ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
                 scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
             end
-            if not (driverCar == raceLeaderCar and (scCleared or rollingStart)) then
+            if not (driverCar == raceLeaderCar and (scCleared or conditionsMet)) then
                 -- All driver helper text
                 ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
             end
@@ -1051,6 +1051,7 @@ function script.update(dt)
 
                 if rollingStart then
                     -- Penalize speeding
+                    --TODO: Add UI text element
                     local driverSpeed = math.floor(driverCar.speedKmh)
                     local penalty = 0
                     if driverSpeed > 160 then penalty = 180
