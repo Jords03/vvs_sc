@@ -139,7 +139,7 @@ end
 local previousDriverCarState = nil
 local previousHelperTextState = nil
 local previousMinus1HelpertextState = nil
-local distanceThreshold = 14
+local distanceThreshold = 16
 local distanceThresholdMultiplier = 2.5
 local distanceEndingThreshold = 250
 
@@ -642,7 +642,9 @@ local function detectErraticAndPos(dt)
             scLeaderText = scLeaderTextState.leader
         end
 
-        if passSafetyCar then
+        if scCleared then
+            newHelperTextState = scHelperTextState.noOvertake
+        elseif passSafetyCar then
             newHelperTextState = scHelperTextState.passSafetyCar
         elseif catchSC and scStatusText ~= scState.returning then
             if car == raceLeaderCar then
@@ -657,9 +659,7 @@ local function detectErraticAndPos(dt)
             newHelperTextState = scHelperTextState.closeGap .. " - " .. math.floor(carDistance) .. "m"
         end
 
-        if scCleared then
-            scHelperText = scHelperTextState.noOvertake
-        end
+        
 
         if newHelperTextState ~= previousHelperTextState then
             --writeLog("state change")
@@ -779,7 +779,7 @@ local function uiFlags(dt)
             ui.drawRectFilled(scFlagBoxStart, scFlagBoxEnd, flagColor, 5, ui.CornerFlags.Bottom)
             ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
 
-            if driverCar ~= safetyCar then
+            if driverCar ~= safetyCar and sim.sessionTimeLeft < 0 then
                 if driverCar == raceLeaderCar
                 and (not rollingStart or (not conditionsMet or scCleared))
                 or debug
