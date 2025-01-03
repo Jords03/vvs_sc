@@ -657,6 +657,10 @@ local function detectErraticAndPos(dt)
             newHelperTextState = scHelperTextState.closeGap .. " - " .. math.floor(carDistance) .. "m"
         end
 
+        if scCleared then
+            scHelperText = scHelperTextState.noOvertake
+        end
+
         if newHelperTextState ~= previousHelperTextState then
             --writeLog("state change")
             if car == raceLeaderCar and scStatusText == scState.returning then
