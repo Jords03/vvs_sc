@@ -149,6 +149,15 @@ local function setSCValues(scSpeed)
     writeLog("SC: SC values set")
 end
 
+local resetSCValues = function()
+    physics.setCarAutopilot(false, false)
+    physics.setAIPitStopRequest(safetyCar.index, false)
+    physics.setAIThrottleLimit(safetyCar.index, 0.65)
+    physics.setAITopSpeed(safetyCar.index, safetyCarSpeed)
+    physics.setAIAggression(safetyCar.index, 0.8)
+    writeLog("SC: SC values reset")
+end
+
 local function setSCSpeedUpValue()
     physics.setAITopSpeed(safetyCar.index, safetyCarSpeed)
 end
@@ -161,10 +170,11 @@ end
 local function setPitInSpeed()
     physics.setAITopSpeed(safetyCar.index, safetyCarPitInSpeed)
     physics.setAIPitStopRequest(safetyCar.index, true)
-    physics.setAILookaheadGasBrake(safetyCar.index, 150)
+    physics.setAILookaheadGasBrake(safetyCar.index, 50)
+    physics.forceUserBrakesFor(3, 0.6)
 end
 
-local function setSCRollingValues()    
+local function setSCRollingValues()
     physics.setCarAutopilot(true, false)
     physics.setAIPitStopRequest(safetyCar.index, true)
     physics.setAIThrottleLimit(safetyCar.index, 0.5)
@@ -192,7 +202,7 @@ end
 
 local function jumpSCtoStart()
     writeLog("SC: Jumping SC to start")
-    local scMetersAhead = 25
+    local scMetersAhead = 15
     local scTrackPos = scMetersAhead / sim.trackLengthM
     local splineAhead = (scMetersAhead + 1) / sim.trackLengthM
 
@@ -707,7 +717,6 @@ function script.update(dt)
                 ac.sendChatMessage("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
                 setPitInSpeed()
-
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
                     underSCLapCount = lc.lapCount
@@ -721,9 +730,18 @@ function script.update(dt)
 
     if scHeadingToPit and safetyCar.isInPit then
         -- Reset SC once entering pit box
-        physics.setCarAutopilot(false, false)
+        -- With fallback if fails
+        resetSCValues()
+
         if ac.tryToTeleportToPits() then
-            ac.tryToStart()
+            if ac.tryToStart() then
+                writeLog("SC: Safety Car has reset in pits")
+            else
+                writeLog("SC: Start in pits failed. Retrying...")
+                waitingToStart = true
+            end
+        else
+            waitingToTeleport = true
         end
         scHeadingToPit = false
         scRequested = false
@@ -731,8 +749,7 @@ function script.update(dt)
         scInPitLane = true
         scConditonsMet = false
         rollingStart = false
-        --ac.sendChatMessage("SC: Safety Car has reset in pits")
-        writeLog("SC: Safety Car has reset in pits")
+        --ac.sendChatMessage("SC: Safety Car has reset in pits")        
     end
 
     if checkLeaderPos then
