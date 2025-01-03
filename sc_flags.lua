@@ -126,7 +126,7 @@ local audioSCDeployedEvent
 local flagWindowPos
 local flagWindowSize = vec2(300, 180)
 local defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
-local defaultFlagWindowPosY = (sim.windowHeight/6) - (flagWindowSize.y/2)
+local defaultFlagWindowPosY = (sim.windowHeight/4) - (flagWindowSize.y/2)
 
 if scFlagsValues.posVec2 == vec2(0.0) or nil then
     scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
