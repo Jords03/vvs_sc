@@ -125,7 +125,7 @@ local audioSCDeployedEvent
 local flagWindowPos
 local flagWindowSize = vec2(300, 180)
 local defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
-local defaultFlagWindowPosY = (sim.windowHeight/8) - (flagWindowSize.y/2)
+local defaultFlagWindowPosY = (sim.windowHeight/6) - (flagWindowSize.y/2)
 
 if scFlagsValues.posVec2 == vec2(0.0) or nil then
     scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
@@ -656,8 +656,11 @@ local function detectErraticAndPos(dt)
                 -- Replaced with UI elements
                 --scLeaderText = scLeaderTextState.maintain
                 --scHelperText = math.floor(car.speedKmh) .. " km/h"
+                scLeaderText = scLeaderTextState.off
                 scHelperText = scHelperTextState.off
                 previousHelperTextState = newHelperTextState
+            elseif car == raceLeaderCar and scStatusText == scState.enteringPit then
+                scLeaderText = scLeaderTextState.goAnyTime
             else
                 -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
                 if previousMinus1HelpertextState == nil then
@@ -722,7 +725,9 @@ local function textSize(text_size, fontsize)
 end
 
 local function uiFlags(dt)
-    if showFlags or scFlagsValues.settingsOpen or debug then         
+    if showFlags or scFlagsValues.settingsOpen or debug then       
+
+        ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)        
 
         local availableSpaceY = ui.availableSpaceY()
         local sectionGridAvailableSpaceY = ui.availableSpaceY() / 4
@@ -756,7 +761,6 @@ local function uiFlags(dt)
         or debug
         then
             --Draw main flag box for everyone
-            ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)        
             
             ui.drawRectFilled(scHeadingTextBoxStart, scHeadingTextBoxEnd, scHeadingTextBG, 5, ui.CornerFlags.Top)
             ui.dwriteDrawText(scHeadingText, headFontSize, scHeadingTextStart, scHeadingTextColor)
@@ -778,7 +782,6 @@ local function uiFlags(dt)
                     ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
                 end
             end
-            ui.endTransparentWindow()
         end
 
         if driverCar ~= safetyCar then
@@ -842,7 +845,7 @@ local function uiFlags(dt)
                 ui.drawRectFilled( vec2(0, 0), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight), rgbm(0.8, 0.8, 0, 1), 0, ui.CornerFlags.None )
                 ui.dwriteTextAligned( speedHelperText, speedHelperFontSize, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-2), false, rgbm(0, 0, 0, 1))
                 
-                ui.drawRectFilled( vec2(0, speedIndicatorBarHeight), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight*2), rgbm(0.1, 0.1, 0.25, 1), 0, ui.CornerFlags.None )
+                ui.drawRectFilled( vec2(0, speedIndicatorBarHeight), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight*2), rgbm(0.15, 0.15, 0.3, 1), 0, ui.CornerFlags.None )
                 ui.dwriteTextAligned( scRollingTextState.maintain, speedHelperFontSize-2, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-10), false, rgbm(0.7, 0.7, 0.7, 1))
                 
                 ui.drawRectFilled( vec2(0, speedIndicatorBarHeight*2 + speedIndicatorValueGap), speedIndicatorEnd, rectColor, 0, ui.CornerFlags.None )
@@ -856,6 +859,8 @@ local function uiFlags(dt)
                 ui.endTransparentWindow()
             end
         end
+        
+        ui.endTransparentWindow()
     end
 end
 
@@ -921,7 +926,7 @@ function script.update(dt)
         ac.debug("SC Flags: scStatusText", scStatusText) ]]
 
 
-        if scOnTrack then
+        if scOnTrack or conditionsMet then
             -- Determine the race leader
             if timeAccumulator - leaderCheckTime >= medCheckInterval then
                 
@@ -978,12 +983,13 @@ function script.update(dt)
                 end
 
                 leaderCheckTime = timeAccumulator
-            end
 
-            if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
-                detectErraticAndPos(dt)
-                --ac.debug("SC Flags: Erratic Running", erraticCheckAccumulator)
-                erraticCheckAccumulator = timeAccumulator
+                -- Check positions and helper text
+                if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
+                    detectErraticAndPos(dt)
+                    --ac.debug("SC Flags: Erratic Running", erraticCheckAccumulator)
+                    erraticCheckAccumulator = timeAccumulator
+                end
             end
         end
         
@@ -1098,6 +1104,7 @@ function script.update(dt)
                 goGreen = true
                 checkGoGreen = false
                 rollingStart = false
+                conditionsMet = false
 
                 timeToDisplayGreenAccumulator = timeAccumulator
             end
