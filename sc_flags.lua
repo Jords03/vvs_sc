@@ -47,6 +47,7 @@ local scLeaderTextState = {
     leader = "YOU ARE RACE LEADER",
     maintain = "MAINTAIN YOUR SPEED",
     goAnyTime = "GO AT ANY TIME",
+    watch = "GET READY",
     off = ""
 }
 
@@ -76,6 +77,7 @@ local carLapCounts = {}
 local raceLeaderCar = nil
 local prevRaceLeaderCar = nil
 local leaderChangedLastBeat = false
+local driverCarSpeed = 0
 
 -- Text variables
 local speedLimit = 100
@@ -184,6 +186,7 @@ local function reInitailizeVars ()
     raceLeaderCar = nil
     prevRaceLeaderCar = nil
     leaderChangedLastBeat = false
+    driverCarSpeed = 0
 
     -- Text variables
     scHeadingText = scHeadingTextState.sc
@@ -355,6 +358,8 @@ local function scDeployed()
     scHeadingText = scHeadingTextState.sc
     --scLeaderText = scLeaderTextState.leader
     headingToPits = false
+    conditionsMet = false
+    rollingStart = false
     scCleared = false
     showFlags = true
     goGreen = false
@@ -469,6 +474,7 @@ btnSCRoll:onPressed(function()
             physics.setAIThrottleLimit(car.index, 0.5)
             physics.setAITopSpeed(car.index, 100)
             physics.setAIAggression(car.index, 0.6)
+            physics.setAISplineAbsoluteOffset(car.index, 0, true)
         end
     end
 end)
@@ -482,6 +488,7 @@ btnSCOn:onPressed(function()
             physics.setAIThrottleLimit(car.index, 0.5)
             physics.setAITopSpeed(car.index, 100)
             physics.setAIAggression(car.index, 0.6)
+            physics.setAISplineAbsoluteOffset(car.index, 0, true)
         end
     end
 end)
@@ -498,7 +505,7 @@ btnSCPits:onPressed(function()
         end
         if car == safetyCar then
             physics.setAIPitStopRequest(car.index, true)
-            physics.setAITopSpeed(car.index, 160)
+            physics.setAITopSpeed(car.index, 120)
             physics.setAILookaheadGasBrake(car.index, 15)
         end
     end
@@ -513,6 +520,7 @@ btnSCOff:onPressed(function()
                 physics.setAIThrottleLimit(car.index, 1)
                 physics.setAITopSpeed(car.index, 100)
                 physics.setAIAggression(car.index, 0.9)
+                physics.setAISplineOffset(car.index, 0, false)
             end
         end
     else
@@ -520,8 +528,13 @@ btnSCOff:onPressed(function()
             if car ~= driverCar then
                 --physics.setCarAutopilot(true, false)
                 physics.setAIThrottleLimit(car.index, 1)
-                physics.setAITopSpeed(car.index, 130)
+                physics.setAITopSpeed(car.index, 100)
                 physics.setAIAggression(car.index, 0.9)
+                physics.setAISplineOffset(car.index, 0, false)
+            end
+            if car == safetyCar then
+                --physics.setAINoInput(car.index, true, false)
+                physics.setAITopSpeed(car.index, 10)
             end
         end
     end
@@ -542,6 +555,8 @@ local function detectErraticAndPos(dt)
 
     local car = driverCar
     if not car then return end
+
+    driverCarSpeed = math.floor(car.speedKmh * 10) / 10
 
     local carAhead = nil
     local tooFar = false
@@ -622,7 +637,7 @@ local function detectErraticAndPos(dt)
 
         if passSafetyCar then
             newHelperTextState = scHelperTextState.passSafetyCar
-        elseif catchSC and scStatusText ~= scState.returning and not rollingStart then
+        elseif catchSC and scStatusText ~= scState.returning then
             if car == raceLeaderCar then
                 newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
             else
@@ -707,9 +722,7 @@ local function textSize(text_size, fontsize)
 end
 
 local function uiFlags(dt)
-    if showFlags or scFlagsValues.settingsOpen or debug then 
-
-        ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)
+    if showFlags or scFlagsValues.settingsOpen or debug then         
 
         local availableSpaceY = ui.availableSpaceY()
         local sectionGridAvailableSpaceY = ui.availableSpaceY() / 4
@@ -735,44 +748,40 @@ local function uiFlags(dt)
         local scStatusTextStart = scFlagBoxCenter - (scStatusTextSize / 2)
         local scLeaderTextStart = scHelperTextCenter - (scLeaderTextSize / 2)
         local scHelperTextStart = scHelperTextCenter - (scHelperTextSize / 2)
-
         ui.pushDWriteFont("RealPenalty")
-        ui.drawRectFilled(scHeadingTextBoxStart, scHeadingTextBoxEnd, scHeadingTextBG, 5, ui.CornerFlags.Top)
-        ui.dwriteDrawText(scHeadingText, headFontSize, scHeadingTextStart, scHeadingTextColor)
 
-        ui.drawRectFilled(scFlagBoxStart, scFlagBoxEnd, flagColor, 5, ui.CornerFlags.Bottom)
-        ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
-        
+        if (not rollingStart or not conditionsMet)
+        and (not (driverCar == raceLeaderCar and conditionsMet) or scCleared)
+        or goGreen
+        or debug
+        then
+            --Draw main flag box for everyone
+            ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)        
+            
+            ui.drawRectFilled(scHeadingTextBoxStart, scHeadingTextBoxEnd, scHeadingTextBG, 5, ui.CornerFlags.Top)
+            ui.dwriteDrawText(scHeadingText, headFontSize, scHeadingTextStart, scHeadingTextColor)
 
-        if driverCar ~= safetyCar then
-            --[[ if raceLeaderCar then
-                if driverCar == raceLeaderCar then
+            ui.drawRectFilled(scFlagBoxStart, scFlagBoxEnd, flagColor, 5, ui.CornerFlags.Bottom)
+            ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
+
+            if driverCar ~= safetyCar then
+                if driverCar == raceLeaderCar
+                and (not rollingStart or (not conditionsMet or scCleared))
+                or debug
+                then
+                    -- Leader only text
                     ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
                     scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
                 end
-            elseif scFlagSettings then
-                ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
-                scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
-            end ]]
-            
-            if driverCar == raceLeaderCar 
-            and not rollingStart 
-            and (not conditionsMet or scCleared)
-            or (scFlagSettings or debug)
-            then
-                -- Leader only text
-                ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
-                scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
+                if not (driverCar == raceLeaderCar and (scCleared or conditionsMet)) then
+                    -- All driver helper text
+                    ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
+                end
             end
-            if not (driverCar == raceLeaderCar and (scCleared or conditionsMet)) then
-                -- All driver helper text
-                ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
-            end
+            ui.endTransparentWindow()
         end
-        ui.endTransparentWindow()
 
-
-       if driverCar ~= safetyCar then
+        if driverCar ~= safetyCar then
             if (rollingStart and conditionsMet)
             or (conditionsMet and driverCar == raceLeaderCar and not scCleared)
             or debug
@@ -782,11 +791,12 @@ local function uiFlags(dt)
                 local speedLimitSignBorder = 12
                 local speedLimitTotalWidth = speedLimitSignSize*2 + speedLimitSignBorder
                 local speedSignXOffset = 250
+                local speedSignYOffset = 25
                 local speedLimitSignStart = vec2(speedLimitSignSize + speedLimitSignBorder / 2, speedLimitSignSize + speedLimitSignBorder / 2)
-                speedLimitSignStart = speedLimitSignStart + flagWindowPos
+                speedLimitSignStart.x = speedLimitSignStart.x + flagWindowPos.x
                 local speedLimitSignBoxSize = speedLimitSignStart * 2 + vec2(speedLimitSignBorder / 2, speedLimitSignBorder / 2)
-                local speedLimitSignPosLeft = vec2(scFlagBoxCenter.x-speedSignXOffset-speedLimitTotalWidth/2, flagWindowSize.y)
-                local speedLimitSignPosRight = vec2(scFlagBoxCenter.x+speedSignXOffset-speedLimitTotalWidth/2, flagWindowSize.y)
+                local speedLimitSignPosLeft = vec2(scFlagBoxCenter.x-speedSignXOffset-speedLimitTotalWidth/2, flagWindowPos.y + speedSignYOffset)
+                local speedLimitSignPosRight = vec2(scFlagBoxCenter.x+speedSignXOffset-speedLimitTotalWidth/2, flagWindowPos.y + speedSignYOffset)
                 local speedLimitFontSize = 32
                 local speedLimitText = tostring(speedLimit)
 
@@ -803,33 +813,47 @@ local function uiFlags(dt)
                 ui.endTransparentWindow()
 
                 -- ### SPEED INDICATOR ###
-                local carSpeed = math.floor(driverCar.speedKmh)
+                --local carSpeed = math.floor(driverCar.speedKmh * 10) / 10
+                local carSpeed = driverCarSpeed
 
-                if carSpeed > 40 or debug then
-                    local speedIndicatorPos = vec2(flagWindowPos.x, flagWindowPos.y+flagWindowSize.y+10)
-                    local speedIndicatorSize = vec2(flagWindowSize.x, 68)
-                    ui.beginTransparentWindow("SC Flags Speed Indicator", speedIndicatorPos, speedIndicatorSize, true, false)
+                --local speedIndicatorPos = vec2(flagWindowPos.x, flagWindowPos.y+flagWindowSize.y+10)
+                local speedIndicatorPos = vec2(flagWindowPos.x, flagWindowPos.y + speedSignYOffset)
+                local speedIndicatorBarHeight = 26
+                local speedIndicatorValueHeight = 32
+                local speedIndicatorValueGap = 6
+                local speedIndicatorValueYOffset = 63
+                local speedIndicatorBoxSize = vec2(flagWindowSize.x, speedIndicatorBarHeight * 2 + speedIndicatorValueGap + speedIndicatorValueHeight) -- * number of rects
+                ui.beginTransparentWindow("SC Flags Speed Indicator", speedIndicatorPos, speedIndicatorBoxSize, true, false)
 
-                    local speedIndicatorFontSize = 22
-                    local speedRatio = speedIndicatorSize.x / speedLimit
-                    local speedIndicatorValue = math.floor(driverCar.speedKmh * speedRatio)
-                    local speedIndicatorEnd = vec2(speedIndicatorValue, availableSpaceY + 30)
-                    local isOverLimit = carSpeed > speedLimit
-                    local speedText = tostring(carSpeed)
-                    local rectColor = isOverLimit and rgbm(0.8, 0, 0, 1) or rgbm(0, 0.8, 0, 1)
+                local speedIndicatorFontSize = 22
+                local speedHelperFontSize = 18
+                local speedRatio = speedIndicatorBoxSize.x / speedLimit
+                local speedIndicatorValue = carSpeed * speedRatio
+                --local speedIndicatorEnd = vec2(speedIndicatorValue, speedIndicatorBarHeight * 2 + speedIndicatorValueHeight)
+                local speedIndicatorEnd = vec2(speedIndicatorValue, speedIndicatorBoxSize.y)
+                local isOverLimit = carSpeed > speedLimit
+                local speedToString = tostring(carSpeed)
+                local rectColor = isOverLimit and rgbm(0.8, 0, 0, 1) or rgbm(0, 0.8, 0, 1)
+                local speedHelperText = scLeaderTextState.watch
+                if rollingStart then
+                    speedHelperText = scRollingTextState.ending
+                end
 
-                    ui.drawRectFilled( vec2(0, 0), vec2(speedIndicatorSize.x, speedIndicatorSize.y/2), rgbm(0.7, 0.7, 0.6, 1), 0, ui.CornerFlags.None )
-                    ui.dwriteTextAligned( scRollingTextState.maintain, speedIndicatorFontSize, ui.Alignment.Center, ui.Alignment.Center, vec2(ui.availableSpaceX(), speedIndicatorSize.y/2), false, rgbm(0, 0, 0, 1))
-                    ui.drawRectFilled( vec2(0, speedIndicatorSize.y/2), speedIndicatorEnd, rectColor, 0, ui.CornerFlags.None )
-                    --ui.drawRectFilled( vec2(0, speedIndicatorSize.y), vec2(speedIndicatorSize.x, speedIndicatorSize.y/2), rectColor, 0, ui.CornerFlags.None )
-                    
-                    ui.dwriteTextAligned( speedText, speedIndicatorFontSize, ui.Alignment.End, ui.Alignment.Center, vec2(60, speedIndicatorSize.y/3), false, rgbm(0, 0, 0, 1))
-                    ui.dwriteDrawText("KMH", speedIndicatorFontSize, vec2(64, 41), rgbm(0, 0, 0, 1))
-                    if isOverLimit or debug then
-                        ui.dwriteDrawText("TOO FAST!", speedIndicatorFontSize, vec2(flagWindowSize.x/2+10, 41), rgbm(0, 0, 0, 1))
-                    end
-                    ui.endTransparentWindow()
-                 end
+                ui.drawRectFilled( vec2(0, 0), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight), rgbm(0.8, 0.8, 0, 1), 0, ui.CornerFlags.None )
+                ui.dwriteTextAligned( speedHelperText, speedHelperFontSize, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-2), false, rgbm(0, 0, 0, 1))
+                
+                ui.drawRectFilled( vec2(0, speedIndicatorBarHeight), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight*2), rgbm(0.1, 0.1, 0.25, 1), 0, ui.CornerFlags.None )
+                ui.dwriteTextAligned( scRollingTextState.maintain, speedHelperFontSize-2, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-10), false, rgbm(0.7, 0.7, 0.7, 1))
+                
+                ui.drawRectFilled( vec2(0, speedIndicatorBarHeight*2 + speedIndicatorValueGap), speedIndicatorEnd, rectColor, 0, ui.CornerFlags.None )
+                --ui.drawRectFilled( vec2(0, speedIndicatorBoxSize.y), vec2(speedIndicatorBoxSize.x, speedIndicatorBoxSize.y/2), rectColor, 0, ui.CornerFlags.None )
+                ui.dwriteDrawText(speedToString, speedIndicatorFontSize, vec2(20, speedIndicatorValueYOffset), rgbm(0, 0, 0, 1))
+                --ui.dwriteTextAligned( speedToString, speedIndicatorFontSize, ui.Alignment.Start, ui.Alignment.Center, vec2(60, speedIndicatorBoxSize.y/3), false, rgbm(0, 0, 0, 1))
+                --ui.dwriteDrawText("KMH", speedIndicatorFontSize, vec2(64, 41), rgbm(0, 0, 0, 1))
+                if isOverLimit or debug then
+                    ui.dwriteDrawText("TOO FAST!", speedIndicatorFontSize, vec2(flagWindowSize.x/2+10, speedIndicatorValueYOffset), rgbm(0, 0, 0, 1))
+                end
+                ui.endTransparentWindow()
             end
         end
     end
@@ -886,7 +910,7 @@ function script.update(dt)
 
         if safetyCar.justJumped then
             writeLog("SC: Safety Car has just jumped")
-            showFlags = false
+            --showFlags = false
         end
     
         --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
