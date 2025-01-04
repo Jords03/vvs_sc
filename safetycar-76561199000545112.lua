@@ -5,7 +5,7 @@ SCRIPT_VERSION = "0.0.0.1"
 SCRIPT_VERSION_CODE = 00001
 
 -- Edit this on per event basis?
-local startBehindSC = true
+local startBehindSC = false
 -- Initialize rolling start boolean
 local rollingStart = startBehindSC
 
@@ -45,7 +45,9 @@ local scLeadDistThresholdMin
 local distanceThresholdMeters
 local carSpacing
 local inPitTimeLimit
-local carPitEntryTimes
+local carsInPit
+local activeCarCount
+local activeCarArray
 local retiredCars
 local previousGapToSC
 local carsNotGainingOnSC
@@ -89,6 +91,8 @@ local scConditonsMet
 local scManualCallin
 local checkLeaderPos
 local underSCLapCount
+local scPrevLapCount
+local scMaxLapsOut
 local raceLeader
 local resetBrakeInPitHack
 local resetBrakeInPitHackSuccess
@@ -134,10 +138,10 @@ local function ensureSimAndSafetyCar()
         return false
     end
     ]]
-    if sim.connectedCars < (minConnectedCars + 1) then
+    --[[ if sim.connectedCars < (minConnectedCars + 1) then
         writeLog("SC: Not enough cars connected")
         return false
-    end
+    end ]]
 
     return true
 end
@@ -263,19 +267,6 @@ local function initializeSCScript()
         ac.disableQuickMenuPitstop(true)
         --Forcing a slight delay to allow for teleport for rolling starts
         waitingToStart = true
-        
-        --[[ if ac.tryToStart() then
-            scInPitLane = true
-            writeLog("SC: First teleportation to pit and start successful")
-            if rollingStart and currentSession.type == ac.SessionType.Race then
-                jumpSCtoStart()
-                scInPitLane = false
-                waitingToRollingStart = true
-            end
-        else
-            writeLog("SC: Start in pits failed. Retrying...")
-            waitingToStart = true
-        end ]]
 
     else
         writeLog("SC: Teleport to pits failed. Retrying...")
@@ -291,7 +282,11 @@ end
 
 local function callSafetyCar()
     if not ensureSimAndSafetyCar() then return end
-    if scActive then
+    if scActive and not rollingStart then
+        if safetyCar.isInPitlane and not safetyCar.isInPit then
+            writeLog("SC: Re-initialization while in pitlane")
+            initializeSCScript()
+        end
         writeLog("SC: Safety Car is being called")
         scRequested = true
         scHeadingToPit = false
@@ -345,96 +340,90 @@ end
 local function updateCarStatuses()
     local scSplinePos = trustableSplinePostionsById[safetyCar.index]
 
+    ac.debug("SC: activeCarCount", #activeCarCount)
+    activeCarCount = 0
+    carsInPit = 0
+    carsNotGainingOnSC = 0
+
     for i, car in ac.iterateCars.ordered() do
         if car ~= safetyCar then
             -- Update pit times or retirement status
-            if car.isInPit then
-                if not carPitEntryTimes[car.index] then
-                    carPitEntryTimes[car.index] = timeAccumulator
+            if car.speedKmh > 10 then
+                if car.isInPitlane then
+                    writeLog("SC: " .. car:driverName() .. " is in pitlane")
+                    carsInPit = carsInPit + 1
                 else
-                    local pitTime = timeAccumulator - carPitEntryTimes[car.index]
-                    if pitTime > inPitTimeLimit then
-                        retiredCars[car.index] = true
-                        writeLog("SC: " .. car:driverName() .. " retired; in pits for " .. pitTime .. " seconds")
+                    writeLog("SC: " .. car:driverName() .. " is on track")
+                    activeCarArray[activeCarCount] = car
+                    activeCarCount = activeCarCount + 1
+
+                    -- Update car's gaps to SC
+                    local carSplinePos = trustableSplinePostionsById[car.index]
+                    local distanceToSC = calculateDistanceToSC(carSplinePos, scSplinePos)
+                    local secondsAhead = distanceToSC * trackLength / math.max(safetyCar.speedMs, 0.1)
+                    local previousSecondsAhead = previousGapToSC[car.index] or secondsAhead
+                    local isGaining = secondsAhead < previousSecondsAhead or secondsAhead < 15
+
+                    previousGapToSC[car.index] = secondsAhead
+                    --TODO: this doesn't seem right in terms of secs ahead
+                    writeLog("SC: " .. car:driverName() .. " | SecAhead: " .. math.floor(secondsAhead) .. " | isGaining: " .. tostring(isGaining))
+
+                    if not isGaining and ((secondsAhead - previousSecondsAhead) > gainingTimeThreshold) then
+                        carsNotGainingOnSC = carsNotGainingOnSC + 1
                     end
                 end
-                if car.isRetired then
-                    retiredCars[car.index] = true
-                    writeLog("SC: " .. car:driverName() .. " isRretired")
-                end
-            else
-                carPitEntryTimes[car.index] = nil
-                retiredCars[car.index] = nil
-
-                -- Update car's gaps to SC
-                local carSplinePos = trustableSplinePostionsById[car.index]
-                local distanceToSC = calculateDistanceToSC(carSplinePos, scSplinePos)
-                local secondsAhead = distanceToSC * trackLength / safetyCar.speedMs
-                local previousSecondsAhead = previousGapToSC[car.index] or secondsAhead
-                local isGaining = secondsAhead < previousSecondsAhead or secondsAhead < 15
-
-                previousGapToSC[car.index] = secondsAhead
-                --TODO: this doesn't seem right in terms of secs ahead
-                writeLog("SC: " .. car:driverName() .. " | SecAhead: " .. secondsAhead .. " | isGaining: " .. tostring(isGaining))
-                
-                if not isGaining and ((secondsAhead - previousSecondsAhead) > gainingTimeThreshold) then
-                    if not carsNotGainingOnSC[car.index] then
-                        carsNotGainingOnSC[car.index] = {notGaining = true, secondsAhead = secondsAhead}
-                        writeLog("SC: CarStatus: " .. car:driverName() .. " is not gaining on SC | Gap is " .. secondsAhead .. " seconds")
-                    end
-                else
-                    carsNotGainingOnSC[car.index] = nil
+            elseif car.isInPit or car.isInPitlane then
+                if not sharedData.carsArray[car.index].isRetired then             
+                    writeLog("SC: " .. car:driverName() .. " is retired")
+                    carsInPit = carsInPit + 1
                 end
             end
         end
     end
+    writeLog("SC: Cars in pit: " .. carsInPit)
+    writeLog("SC: Active cars: " .. activeCarCount)
+    writeLog("SC: Cars not gaining on SC: " .. carsNotGainingOnSC)
 end
 
 -- Check if the Safety Car can come in based on the number of cars and their positions
 local function canSafetyCarComeIn()
 
-    local connectedCars = sim.connectedCars
-    if connectedCars < 1 then
-        writeLog("SC: Not enough cars connected")
-        return false
-    end
-
     updateCarStatuses()
-    
-    local retiredCarsCount = retiredCars and #retiredCars or 0
-    local carsNotGainingCount = carsNotGainingOnSC and #carsNotGainingOnSC or 0  
 
-    local N = connectedCars - retiredCarsCount - carsNotGainingCount - 1 -- -1 to exclude SC
+    --local connectedCars = sim.connectedCars
+    --local carsNotGainingCount = carsNotGainingOnSC and #carsNotGainingOnSC or 0
+    --local N = connectedCars - retiredCarsCount - carsNotGainingCount - 1
 
-    distanceThresholdMeters = (N + 2) * carSpacing
-
-    ac.debug("SC: N (Cars) ", N)
-    ac.debug("SC: Connected Cars", connectedCars)
-    ac.debug("SC: Distance Threshold", distanceThresholdMeters)
-
+    local N = activeCarCount - carsInPit - carsNotGainingOnSC
     local carsNearAndBehindSC = 0
 
-    for i, car in ac.iterateCars.ordered() do
+    distanceThresholdMeters = (N + 3) * carSpacing
+
+    ac.debug("SC: COMEIN? N (Cars) ", N)
+    ac.debug("SC: COMEIN? Active Cars", activeCarCount)
+    ac.debug("SC: COMEIN? Distance Threshold", distanceThresholdMeters)
+    ac.debug("SC: COMEIN? Cars in Pit", carsInPit)
+    ac.debug("SC: COMEIN? Cars Not Gaining", carsNotGainingOnSC)
+
+    for car in activeCarArray do
         if carsNearAndBehindSC >= N then
             break
         end
-
-        if not (retiredCars[car.index] or carsNotGainingOnSC[car.index] or car == safetyCar) then
-            local distanceToSC = calculateDistanceToSC(trustableSplinePostionsById[car.index], trustableSplinePostionsById[safetyCar.index])
-            local distanceMeters = distanceToSC * trackLength
-            if car and distanceMeters < distanceThresholdMeters then
-                carsNearAndBehindSC = carsNearAndBehindSC + 1
-            end
+        local distanceToSC = calculateDistanceToSC(trustableSplinePostionsById[car.index], trustableSplinePostionsById[safetyCar.index])
+        local distanceMeters = distanceToSC * trackLength
+        if car and distanceMeters < distanceThresholdMeters then
+            carsNearAndBehindSC = carsNearAndBehindSC + 1
         end
     end
     --writeLog("SC: carsNearAndBehindSC = " .. carsNearAndBehindSC)
-    ac.debug("SC: CarsNearAndBehindSC", carsNearAndBehindSC)
+    ac.debug("SC: COMEIN? CarsNearAndBehindSC", carsNearAndBehindSC)
     local result = carsNearAndBehindSC >= N
-    ac.debug("SC: SC can come in", result)
+    ac.debug("SC: COMEIN? SC can come in", result)
     --writeLog(result and "SC: Safety Car can come in this lap." or "SC: Not all cars are within threshold the Safety Car.")
     return result
 end
 
+-- For deciding if race is near complete
 -- Calculates the average best lap time of up to three drivers on the leaderboard.
 local function calculateAverageBestLapTime(session)
     if not (session and session.leaderboard and #session.leaderboard > 0) then
@@ -454,6 +443,7 @@ local function calculateAverageBestLapTime(session)
     return averageBestLapTimeMs
 end
 
+-- For deciding if race is near complete
 -- Calculates the session length and the time the SC should be active for`2
 local function sessionTimeCalcs()
     if not currentSession then return false end
@@ -471,7 +461,7 @@ local function sessionTimeCalcs()
     end
 
     scActiveTime = sessionLength - (averageBestLapTime * scDisableWithLapsToGo)
-  
+
     writeLog("SC: Average Best Lap Time: " .. averageBestLapTime)
     writeLog("SC: Session Length: " .. sessionLength)
 end
@@ -480,15 +470,9 @@ end
 local function getLeadingCarBehindSC()
     local leadingCarNotInPit = nil
     local distanceMeters = nil
-    --local sessionLeader = nil
 
     local trustableValues = sharedData.carsArray
     local activeCars = sharedData.activeCarsCount
-    
-    --[[ sessionLeader = ac.getCar(trustableValues[1].carId)
-    if sessionLeader ~= nil then
-        ac.debug("SC: SessionState Leader", sessionLeader:driverName())
-    end ]]
 
     for pos=1,activeCars,1 do
         local car = ac.getCar(trustableValues[pos].carId)
@@ -507,8 +491,8 @@ local function getLeadingCarBehindSC()
         local distance = calculateDistanceToSC(carSplinePos, scSplinePos)
 
         distanceMeters = distance * trackLength
-        ac.debug("SC: LC distance to SC:", distanceMeters)
-        ac.debug("SC: scSplinePos:", scSplinePos)
+        --ac.debug("SC: LC distance to SC:", distanceMeters)
+        --ac.debug("SC: scSplinePos:", scSplinePos)
     end
 
     return leadingCarNotInPit, distanceMeters
@@ -531,23 +515,24 @@ function script.update(dt)
     ac.debug("SC: timeAccumulator", timeAccumulator)
    
     ac.debug("SC: z-sessionTimeLeft", sim.sessionTimeLeft * -1)
-    ac.debug("SC: z-timeToSessionStart", sim.timeToSessionStart)
+    --[[ ac.debug("SC: z-timeToSessionStart", sim.timeToSessionStart)
     ac.debug("SC: z-currentSessionTime",sim.currentSessionTime)
     
-    --[[ ac.debug("SC: In pitlane", safetyCar.isInPitlane)
+    ac.debug("SC: In pitlane", safetyCar.isInPitlane)
     ac.debug("SC: In pitbox", safetyCar.isInPit)
     ac.debug("SC: SplinePos", safetyCar.splinePosition)
     ac.debug("SC: onTrack", scOnTrack)
     ac.debug("SC: inPitLane", scInPitLane)
     ac.debug("SC: scRequested", scRequested)
-    ac.debug("SC: scHeadingToPit", scHeadingToPit) ]]
+    ac.debug("SC: scHeadingToPit", scHeadingToPit) 
     ac.debug("SC: checkClosestCarToSC", checkClosestCarToSC)
     --ac.debug("SC: scActive", scActive)
     ac.debug("SC: Rolling Start", rollingStart)
     ac.debug("SC: 1-steer", safetyCar.steer)
     ac.debug("SC: 1-resetBrakeInPitHack", resetBrakeInPitHack)
     ac.debug("SC: 1-resetBrakeInPitHackSuccess", resetBrakeInPitHackSuccess)
-    
+    ]]
+
     if currentSession then    
         ac.debug("SC: Session Duration", currentSession.durationMinutes)
     end
@@ -573,7 +558,7 @@ function script.update(dt)
                 if rollingStart and sim.raceSessionType == 3 then
                     jumpSCtoStart()
                     waitingToRollingStart = true
-                else             
+                else
                     scInPitLane = true
                     scOnTrack = false
                 end
@@ -605,7 +590,7 @@ function script.update(dt)
     end
 
     -- stop if not enough cars connected
-    if sim.connectedCars < (minConnectedCars + 1) then return end
+    -- if sim.connectedCars < (minConnectedCars + 1) then return end
     -- stop if not race session
     --if sim.raceSessionType ~= 3 then return end
 
@@ -619,6 +604,7 @@ function script.update(dt)
             scOnTrack = true
             scInPitLane = false
             checkClosestCarToSC = true
+            scPrevLapCount = safetyCar.lapCount
             setSCValues(safetyCarInitialSpeed)
             setSCLights("on")
         end
@@ -683,9 +669,9 @@ function script.update(dt)
     end
 
     if resetBrakeInPitHack then
-        if safetyCar.steer < 5 or safetyCar.steer > -5 then
+        if safetyCar.steer < 3 or safetyCar.steer > -3 then
             physics.setCarAutopilot(false, false)
-            physics.forceUserBrakesFor(2, 0.9)
+            physics.forceUserBrakesFor(1.25, 0.65)
             resetBrakeInPitHack = false
             resetBrakeInPitHackSuccess = true
         end
@@ -728,9 +714,13 @@ function script.update(dt)
         if not scHeadingToPit then
             if scOnTrack and not scConditonsMet then
                 local scSplinePos = trustableSplinePostionsById[safetyCar.index]
+                -- TODO: Ask Nigel to if we can get PitLane Spline?
                 if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
                     ac.debug("SC: Safety Car within threshold", true)
-                    if canSafetyCarComeIn() or rollingStart then
+                    if canSafetyCarComeIn()
+                    or rollingStart
+                    or safetyCar.lapCount - scPrevLapCount >= scMaxLapsOut
+                    then
                         scConditonsMet = true
                         ac.sendChatMessage("SC: Safety Car in this lap")
                         writeLog("SC: Conditions met for Safety Car to come in")
@@ -748,10 +738,12 @@ function script.update(dt)
                 ac.sendChatMessage("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
                 setPitInSpeed()
+                
+                -- TODO: Is this needed - prob not anymore
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
                     underSCLapCount = lc.lapCount
-                    checkLeaderPos = true
+                    --checkLeaderPos = true
                     writeLog("SC: Leader on SC clear | " .. lc:driverName())
                 end
             end
@@ -780,20 +772,21 @@ function script.update(dt)
         --ac.sendChatMessage("SC: Safety Car has reset in pits")        
     end
 
-    if checkLeaderPos then
+    --[[ if checkLeaderPos then
         local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
         if sessionLeader == safetyCar then
             sessionLeader = ac.getCar(sharedData.carsArray[2].carId)
         end
 
+        -- TODO: Ask Nigel to check this
         if sessionLeader and underSCLapCount < sessionLeader.lapCount then
             local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-            ac.sendChatMessage("SC: Go Green | " .. timeStamp)
+            --ac.sendChatMessage("SC: Go Green | " .. timeStamp)
             checkLeaderPos = false
             writeLog("SC: Go Green - " .. sessionLeader:driverName())
             writeLog("SC: Leader Lap Count - GO Green" .. sessionLeader.lapCount)
         end
-    end
+    end ]]
 
 end
 
@@ -810,15 +803,17 @@ local function initializeSSStates()
     safetyCarInitialSpeed = 30
     safetyCarSpeed = 100 -- Speed in km/h
     safetyCarInSpeed = 180
-    safetyCarPitInSpeed = 15
+    safetyCarPitInSpeed = 25
     scLeadDistThresholdMin = 120 -- update to adjust to speed of leader
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 28 -- multiplier for distance behind SC N x carSpacing
     inPitTimeLimit = 120 -- seconds
-    carPitEntryTimes = {}
+    carsInPit = 0
+    activeCarCount = 0
+    activeCarArray = {}
     retiredCars = {}
     previousGapToSC = {}
-    carsNotGainingOnSC = {}
+    carsNotGainingOnSC = 0
     gainingTimeThreshold = 2
     minConnectedCars = 1
 
@@ -859,6 +854,8 @@ local function initializeSSStates()
     scManualCallin = false
     checkLeaderPos = false
     underSCLapCount = 0
+    scPrevLapCount = 0
+    scMaxLapsOut = 2
     raceLeader = nil
     resetBrakeInPitHack = false
     resetBrakeInPitHackSuccess = false
