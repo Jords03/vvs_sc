@@ -927,6 +927,10 @@ function script.update(dt)
         return
     end
 
+    if sim.timeToSessionStart <= 20000 and sim.timeToSessionStart > 19950 then
+        initializeSCFlagScript()
+    end
+
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
