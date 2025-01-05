@@ -784,7 +784,7 @@ local function uiFlags(dt)
             ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
 
             --if driverCar ~= safetyCar and sim.sessionTimeLeft < 0 then
-            if driverCar ~= safetyCar then
+            if driverCar ~= safetyCar and sim.timeToSessionStart < 0 then
                 if driverCar == raceLeaderCar
                 and (not rollingStart or (not conditionsMet or scCleared))
                 or debug
@@ -798,8 +798,7 @@ local function uiFlags(dt)
                     ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
                 end
             end
-        end
-        ui.endTransparentWindow()
+        end        
 
         if driverCar ~= safetyCar then
             if (rollingStart and conditionsMet)
@@ -891,7 +890,7 @@ local function uiFlags(dt)
             ui.endTransparentWindow() ]]
             -- Penalties Display End
         end
-        
+        ui.endTransparentWindow()
     end
 end
 
@@ -909,7 +908,6 @@ function script.update(dt)
     ac.debug("SC Flags: 3-conditionsMet", conditionsMet)
     ac.debug("SC Flags: 4-scOnTrack", scOnTrack)
     ac.debug("SC Flags: 5-scClear", scCleared)
-    ac.debug("SC Flags: 0-sim.sessionTimeLeft", sim.sessionTimeLeft)
     if driverCar then
         ac.debug("SC Flags: 6-driverCar", driverCar:driverName())
     end
