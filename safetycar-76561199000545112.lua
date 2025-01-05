@@ -20,6 +20,7 @@ local sharedData = ac.connect({
     ac.StructItem.key('vvs.car_tracker'),
     raceHasStarted = ac.StructItem.boolean(),
     activeCarsCount = ac.StructItem.int16(),
+    safetyCarCallout = ac.StructItem.boolean(),
     carsArray = ac.StructItem.array(ac.StructItem.struct({
         carId = ac.StructItem.int16(),
         splinePosition = ac.StructItem.double(),
@@ -792,6 +793,14 @@ function script.update(dt)
 
     -- Things we do every 0.5 (shorter) seconds
     if timeAccumulator - timeHalfSecAccumulator >= timeHalfSec then
+
+        --check if the SC has been called out
+        if sharedData.safetyCarCallout then
+            sharedData.safetyCarCallout = false
+            callSafetyCar()
+            writeLog("SC: SC scon received from shared data")
+        end
+
         refreshSplineList()
         if not scHeadingToPit then
             if scOnTrack and not scConditonsMet then
