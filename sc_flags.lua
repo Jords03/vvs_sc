@@ -916,6 +916,8 @@ function script.update(dt)
     end
     ac.debug("SC Flags: 9-showFlags", showFlags)
     ac.debug("SC Flags: flagWindowPos", flagWindowPos)
+    ac.debug("SC Flags: directMessageAvailable", sim.directMessagingAvailable)
+    
 
     --don't do anything for first 2 seconds
     if timeAccumulator < 2 then
