@@ -171,7 +171,7 @@ local function getStates()
     end
 end
 
-local function reInitailizeVars()
+local function reInitailizeVars ()
     -- Initialize variables
     flagColor = rgbm.colors.gray
     showFlags = false
@@ -246,8 +246,6 @@ local function initializeSCFlagScript()
     flagColor = rgbm.colors.gray
     showFlags = false
     goGreen = false
-    scOnTrack = false
-    rollingStart = false
     debug = false
     getStates()
     reInitailizeVars()
@@ -455,7 +453,6 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 -- Unused -> we track leader on client side for accuracy
             elseif message == "SC kill" then
                 initializeSCFlagScript()
-                writeLog("SC: Recieved - SC kill")
             end
         end
     end
@@ -942,7 +939,7 @@ function script.update(dt)
 
         if safetyCar.justJumped then
             writeLog("SC: Safety Car has just jumped")
-            showFlags = false
+            --showFlags = false
         end
     
         --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
