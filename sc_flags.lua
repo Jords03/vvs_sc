@@ -701,6 +701,9 @@ local function detectErraticAndPos(dt)
             end
         end
 
+        ac.debug("SC Flags: Inside Pos Check", dt)
+        ac.debug("SC Flags: Inside Pos Check catchSC", catchSC)
+
         -- Debugging output
         --[[ ac.debug("SC Flags: newHelperTextState", newHelperTextState)
         ac.debug("SC Flags: previousHelperTextState", previousHelperTextState)
@@ -954,7 +957,6 @@ function script.update(dt)
         ac.debug("SC FLags: flagWindowPos", flagWindowPos)
         ac.debug("SC Flags: scStatusText", scStatusText) ]]
 
-
         if scOnTrack or conditionsMet then
             -- Determine the race leader
             if timeAccumulator - leaderCheckTime >= medCheckInterval then
@@ -1010,15 +1012,14 @@ function script.update(dt)
                         end
                     end
                 end
-
                 leaderCheckTime = timeAccumulator
+            end
 
-                -- Check positions and helper text
-                if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
-                    detectErraticAndPos(dt)
-                    --ac.debug("SC Flags: Erratic Running", erraticCheckAccumulator)
-                    erraticCheckAccumulator = timeAccumulator
-                end
+            -- Check positions and helper text
+            if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
+                detectErraticAndPos(dt)
+                --ac.debug("SC Flags: Erratic Running", erraticCheckAccumulator)
+                erraticCheckAccumulator = timeAccumulator
             end
         end
         
