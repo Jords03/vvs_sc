@@ -171,7 +171,7 @@ local function getStates()
     end
 end
 
-local function reInitailizeVars ()
+local function reInitailizeVars()
     -- Initialize variables
     flagColor = rgbm.colors.gray
     showFlags = false
@@ -246,6 +246,8 @@ local function initializeSCFlagScript()
     flagColor = rgbm.colors.gray
     showFlags = false
     goGreen = false
+    scOnTrack = false
+    rollingStart = false
     debug = false
     getStates()
     reInitailizeVars()
@@ -453,6 +455,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 -- Unused -> we track leader on client side for accuracy
             elseif message == "SC kill" then
                 initializeSCFlagScript()
+                writeLog("SC: Recieved - SC kill")
             end
         end
     end
@@ -698,6 +701,9 @@ local function detectErraticAndPos(dt)
             end
         end
 
+        ac.debug("SC Flags: Inside Pos Check", dt)
+        ac.debug("SC Flags: Inside Pos Check catchSC", catchSC)
+
         -- Debugging output
         --[[ ac.debug("SC Flags: newHelperTextState", newHelperTextState)
         ac.debug("SC Flags: previousHelperTextState", previousHelperTextState)
@@ -792,7 +798,8 @@ local function uiFlags(dt)
                 end
             end
         end
-
+        ui.endTransparentWindow()
+        
         if driverCar ~= safetyCar then
             if (rollingStart and conditionsMet)
             or (conditionsMet and driverCar == raceLeaderCar and not scCleared)
@@ -884,7 +891,6 @@ local function uiFlags(dt)
             -- Penalties Display End
         end
         
-        ui.endTransparentWindow()
     end
 end
 
@@ -913,6 +919,8 @@ function script.update(dt)
     end
     ac.debug("SC Flags: 9-showFlags", showFlags)
     ac.debug("SC Flags: flagWindowPos", flagWindowPos)
+    ac.debug("SC Flags: directMessageAvailable", sim.directMessagingAvailable)
+    
 
     --don't do anything for first 2 seconds
     if timeAccumulator < 2 then
@@ -939,7 +947,7 @@ function script.update(dt)
 
         if safetyCar.justJumped then
             writeLog("SC: Safety Car has just jumped")
-            --showFlags = false
+            showFlags = false
         end
     
         --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
@@ -948,7 +956,6 @@ function script.update(dt)
         ac.debug("SC FLags: scState", scStatusText)
         ac.debug("SC FLags: flagWindowPos", flagWindowPos)
         ac.debug("SC Flags: scStatusText", scStatusText) ]]
-
 
         if scOnTrack or conditionsMet then
             -- Determine the race leader
@@ -1005,15 +1012,14 @@ function script.update(dt)
                         end
                     end
                 end
-
                 leaderCheckTime = timeAccumulator
+            end
 
-                -- Check positions and helper text
-                if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
-                    detectErraticAndPos(dt)
-                    --ac.debug("SC Flags: Erratic Running", erraticCheckAccumulator)
-                    erraticCheckAccumulator = timeAccumulator
-                end
+            -- Check positions and helper text
+            if timeAccumulator - erraticCheckAccumulator >= miniCheckInterval then
+                detectErraticAndPos(dt)
+                --ac.debug("SC Flags: Erratic Running", erraticCheckAccumulator)
+                erraticCheckAccumulator = timeAccumulator
             end
         end
         
