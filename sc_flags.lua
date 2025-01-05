@@ -942,7 +942,7 @@ function script.update(dt)
 
         if safetyCar.justJumped then
             writeLog("SC: Safety Car has just jumped")
-            showFlags = false
+            --showFlags = false
         end
     
         --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
