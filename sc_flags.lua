@@ -927,7 +927,7 @@ function script.update(dt)
         return
     end
 
-    if sim.timeToSessionStart <= 20000 and sim.timeToSessionStart > 19950 then
+    if sim.timeToSessionStart <= 20000 and sim.timeToSessionStart > 19000 then
         initializeSCFlagScript()
     end
 
