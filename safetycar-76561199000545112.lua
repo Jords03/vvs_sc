@@ -13,7 +13,7 @@ local rollingStart = startBehindSC
 local sim = ac.getSim()
 local currentSession = ac.getSession(sim.currentSessionIndex)
 local safetyCarName = "Safety Car"
-local adminName = "Jon Astrop"
+local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 
 --shared data structure for real car data
 local sharedData = ac.connect({
@@ -33,7 +33,7 @@ local sharedData = ac.connect({
 local safetyCarID
 local safetyCar
 local adminCarID
-local adminCar
+local adminCars={}
 
 -- Safety Car Speeds and thresholds
 local trackLength
@@ -117,12 +117,15 @@ local function getSafetyCar()
 end
 
 local function getAdminCar()
-    adminCarID = ac.getCarByDriverName(adminName)
-    if adminCarID then
-        adminCar = ac.getCar(adminCarID)
-    else
-        writeLog("SC: Admin car not found during initialization")
+    for i,v in ipairs(adminNames) do
+        adminCarID = ac.getCarByDriverName(v)
+        if adminCarID then
+            table.insert(adminCars,adminCarID)
+        else
+            writeLog("SC: Admin car not found during initialization")
+        end
     end
+    
     return nil
 end
 
@@ -377,9 +380,18 @@ local function callSafetyCar()
     end
 end
 
+local function tableContains(testTable, value)
+    for i = 1,#testTable do
+      if (testTable[i] == value) then
+        return true
+      end
+    end
+    return false
+  end
+
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
-    if senderCarIndex == safetyCar.index or (adminCar and senderCarIndex == adminCar.index) then
+    if senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) then
         if message == "SC scon" then
             callSafetyCar()
             writeLog("SC: SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
@@ -431,10 +443,10 @@ local function updateCarStatuses()
             -- Update pit times or retirement status
             if car.speedKmh > 10 then
                 if car.isInPitlane then
-                    writeLog("SC: " .. car:driverName() .. " is in pitlane")
+                    ac.debug("SC: " .. car:driverName() .. " is in pitlane", true)
                     carsInPit = carsInPit + 1
                 else
-                    writeLog("SC: " .. car:driverName() .. " is on track")
+                    ac.debug("SC: " .. car:driverName() .. " is on track", true)
                     activeCarArray[activeCarCount] = car
                     activeCarCount = activeCarCount + 1
 
