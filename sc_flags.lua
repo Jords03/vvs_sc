@@ -8,8 +8,8 @@ local driverCar = ac.getCar(0)
 local safetyCarName = "Safety Car"
 --local safetyCarName = "VVS SafetyCar" --this is the old skin ui name, have renamed
 local safetyCar = nil
-local adminCarName = "Jon Astrop"
-local adminCar = nil
+local adminCarNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
+local adminCars = {}
 local trackLength = sim.trackLengthM
 
 --shared data structure for sc flags settings
@@ -165,10 +165,13 @@ local function getStates()
         safetyCar = ac.getCar(safetyCarID)
     end
 
-    local adminCarID = ac.getCarByDriverName(adminCarName)
-    if adminCarID then
-        adminCar = ac.getCar(adminCarID)
+    for i,v in ipairs(adminCarNames) do
+        local adminCarID = ac.getCarByDriverName(v)
+        if adminCarID then
+            table.insert(adminCars,adminCarID)
+        end
     end
+
 end
 
 local function reInitailizeVars()
@@ -429,12 +432,22 @@ local function setConditionsLateJoin()
     end
 end
 
+
+local function tableContains(testTable, value)
+    for i = 1,#testTable do
+      if (testTable[i] == value) then
+        return true
+      end
+    end
+    return false
+  end
+
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     if string.startsWith(message, "SC:") then
         if not safetyCar then
             getStates()
         end
-        if (senderCarIndex == safetyCar.index or senderCarIndex == adminCar.index) then
+        if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
             writeLog("SC: chatmsg: " .. message)
             if message == "SC: Safety Car rolling start" then
                 writeLog("SC: Recieved - Safety Car rolling start")
@@ -943,7 +956,7 @@ function script.update(dt)
         if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
             --repositionFlags()
             -- Check if all states exist; if not, re-initialize them
-            if not sim or not currentSession or not driverCar or not safetyCar or not adminCar then
+            if not sim or not currentSession or not driverCar or not safetyCar or not adminCars then
                 getStates()
             end
             checkStatesAccumulator = timeAccumulator
