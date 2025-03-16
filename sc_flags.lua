@@ -254,6 +254,13 @@ local function initializeSCFlagScript()
     debug = false
     getStates()
     reInitailizeVars()
+    if (driverCar ==nil) then
+        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation ERROR driverCar not identified!")
+    elseif (safetyCar == nil) then
+        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
+    else
+        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
+    end
 end
 
 -- Define the callback function
