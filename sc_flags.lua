@@ -246,7 +246,6 @@ local function repositionFlags()
 end
 
 local function initializeSCFlagScript()
-    --writeLog("SC: Initialization called.")
     flagColor = rgbm.colors.gray
     showFlags = false
     goGreen = false
@@ -255,15 +254,6 @@ local function initializeSCFlagScript()
     debug = false
     getStates()
     reInitailizeVars()
-    --writeLog("SC: Initialization finished - sending notification messages.")
-    --[[if (driverCar ==nil) then
-        ac.sendChatMessage("SC INFO SC Flags Script Initialisation ERROR driverCar not identified!")
-    elseif (safetyCar == nil) then
-        ac.sendChatMessage("SC INFO SC Flags Script Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
-    else
-        ac.sendChatMessage("SC INFO SC Flags Script Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
-    end]]
-    --ac.sendChatMessage("TEST")
 end
 
 -- Define the callback function
