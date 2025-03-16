@@ -257,11 +257,11 @@ local function initializeSCFlagScript()
     reInitailizeVars()
     writeLog("SC: Initialization finished - sending notification messages.")
     if (driverCar ==nil) then
-        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation ERROR driverCar not identified!")
+        ac.sendChatMessage("SC INFO SC Flags Script Initialisation ERROR driverCar not identified!")
     elseif (safetyCar == nil) then
-        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
+        ac.sendChatMessage("SC INFO SC Flags Script Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
     else
-        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
+        ac.sendChatMessage("SC INFO SC Flags Script Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
     end
 end
 
