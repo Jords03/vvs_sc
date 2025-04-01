@@ -1161,6 +1161,18 @@ function script.update(dt)
                 conditionsMet = false
 
                 timeToDisplayGreenAccumulator = timeAccumulator
+
+                if driverCar ~= nil and raceLeaderCar ~= nil then
+                    if driverCar == raceLeaderCar then
+                        if rollingStart then
+                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName())
+                        else
+                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName())
+                        end
+                    end
+                end
+
+                
             end
         end
         -- Go green same time end
