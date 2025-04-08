@@ -896,26 +896,9 @@ function script.update(dt)
         --ac.sendChatMessage("SC: Safety Car has reset in pits")        
     end
 
-    --[[Log penalty for speeding under SC rolling start
-    if rollingStart then
-        -- Penalize speeding
-        --TODO: Add UI text element
-        local penalty = 0
-        driverCarSpeed = math.floor(driverCar.speedKmh * 10) / 10
-        if driverCarSpeed > 160 then penalty = 90
-        elseif driverCarSpeed > 140 then penalty = 45
-        elseif driverCarSpeed > 120 then penalty = 20
-        elseif driverCarSpeed > 110 then penalty = 10
-        elseif driverCarSpeed > 105 then penalty = 5
-        end
-        if penalty > 0 then
-            --ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
-            writeLog("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
-        end
-    end
-    ]]
-
-    --[[ if checkLeaderPos then
+    --use leader crossing sf to ensure rollingstart is not set
+   
+     if checkLeaderPos then
         local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
         if sessionLeader == safetyCar then
             sessionLeader = ac.getCar(sharedData.carsArray[2].carId)
@@ -923,13 +906,11 @@ function script.update(dt)
 
         -- TODO: Ask Nigel to check this
         if sessionLeader and underSCLapCount < sessionLeader.lapCount then
-            local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-            --ac.sendChatMessage("SC: Go Green | " .. timeStamp)
             checkLeaderPos = false
-            writeLog("SC: Go Green - " .. sessionLeader:driverName())
-            writeLog("SC: Leader Lap Count - GO Green" .. sessionLeader.lapCount)
+            writeLog("SC: Go Green - " .. sessionLeader:driverName() .. " | " .. sessionLeader.lapCount)
+            rollingStart = false
         end
-    end ]]
+    end
 
 end
 
