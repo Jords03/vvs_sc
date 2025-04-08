@@ -969,13 +969,7 @@ function script.update(dt)
     end
 
     if showFlags or debug then        
-
-        --nixing this check as it fucked us up and I don't think we need it
-        --if safetyCar.justJumped then
-        --    writeLog("SC: Safety Car has just jumped")
-        --    showFlags = false
-        --end
-    
+  
         --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
         ac.debug("SC FLags: showFlags", showFlags)
         ac.debug("SC FLags: goGreen", goGreen)
@@ -1069,11 +1063,12 @@ function script.update(dt)
                 scOnTrack = false
                 goGreen = false
                 scCleared = false
+
                 writeLog("SC: Gone green - Flags off")
                 timeToDisplayGreenAccumulator = timeAccumulator
                 
                 --TODO: Add this reInitialize here to reset all values once flags disapear?
-                --reInitailizeVars()
+                reInitailizeVars()
             end
         end
         --[[ 
@@ -1176,9 +1171,9 @@ function script.update(dt)
                     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
                     local timeLeft = sim.sessionTimeLeft
                     if rollingStart then
-                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. raceLeaderCar:driverName() .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
+                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
                     else
-                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. raceLeaderCar:driverName() .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
+                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
                     end
                 end
 
