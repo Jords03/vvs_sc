@@ -288,8 +288,29 @@ end
 
 local function jumpSCtoStart()
     writeLog("SC: Jumping SC to start")
-    local scMetersAhead = 15
+    local scMetersAhead = 25
     local scTrackPos = scMetersAhead / sim.trackLengthM
+
+    --get spline pos of lead car
+    local leadCarPosition = 99
+    local leadCarSplinePos = -1
+
+    for i, car in ac.iterateCars.ordered() do
+        if car ~= safetyCar then
+            local leaderboardPosition = ac.getCarLeaderboardPosition(car.index)
+            if leaderboardPosition < leadCarPosition then
+                leadCarPosition = leaderboardPosition
+                leadCarSplinePos = car.splinePosition
+            end
+        end
+    end
+    --add that to the 25m offset for the SC car jump to position
+    scTrackPos = scTrackPos + leadCarSplinePos
+    --if this has sent it above 1 (i.e. if lead car is at spline 0.99x then normalise back to between 0 and 1)
+    if scTrackPos >= 1 then
+        scTrackPos = scTrackPos -1
+    end
+
     local splineAhead = (scMetersAhead + 1) / sim.trackLengthM
 
     local function normalize_position(C, L, R)
@@ -397,7 +418,7 @@ local function processChatMessage(message, senderCarIndex)
             writeLog("SC: SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
         elseif message == "SC scoff" then
             scManualCallIn = true
-            rollingStart = false
+            --rollingStart = false
             scConditonsMet = true
             scHeadingToPit = true
             scRequested = false
@@ -874,6 +895,25 @@ function script.update(dt)
         rollingStart = false
         --ac.sendChatMessage("SC: Safety Car has reset in pits")        
     end
+
+    --[[Log penalty for speeding under SC rolling start
+    if rollingStart then
+        -- Penalize speeding
+        --TODO: Add UI text element
+        local penalty = 0
+        driverCarSpeed = math.floor(driverCar.speedKmh * 10) / 10
+        if driverCarSpeed > 160 then penalty = 90
+        elseif driverCarSpeed > 140 then penalty = 45
+        elseif driverCarSpeed > 120 then penalty = 20
+        elseif driverCarSpeed > 110 then penalty = 10
+        elseif driverCarSpeed > 105 then penalty = 5
+        end
+        if penalty > 0 then
+            --ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
+            writeLog("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
+        end
+    end
+    ]]
 
     --[[ if checkLeaderPos then
         local sessionLeader = ac.getCar(sharedData.carsArray[1].carId)
