@@ -450,7 +450,7 @@ local function tableContains(testTable, value)
   end
 
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
-    if string.startsWith(message, "SC:") then
+    if string.startsWith(message, "SC") then
         if not safetyCar then
             getStates()
         end
