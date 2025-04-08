@@ -440,7 +440,6 @@ local function setConditionsLateJoin()
     end
 end
 
-
 local function tableContains(testTable, value)
     for i = 1,#testTable do
       if (testTable[i] == value) then
@@ -948,6 +947,16 @@ function script.update(dt)
         return
     end
 
+    --TODO: Moving this as it was inside showflags which wouldnt run.  
+    --Redundant since checkStates() runs inside Initialize script within timeToSessionStart check
+    if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
+        -- Check if all states exist; if not, re-initialize them
+        if not sim or not currentSession or not driverCar or not safetyCar or not adminCars then
+            getStates()
+        end
+        checkStatesAccumulator = timeAccumulator
+    end
+
     if sim.timeToSessionStart <= 20000 and sim.timeToSessionStart > 19000 then
         initializeSCFlagScript()
     end
@@ -961,19 +970,11 @@ function script.update(dt)
 
     if showFlags or debug then        
 
-        if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
-            --repositionFlags()
-            -- Check if all states exist; if not, re-initialize them
-            if not sim or not currentSession or not driverCar or not safetyCar or not adminCars then
-                getStates()
-            end
-            checkStatesAccumulator = timeAccumulator
-        end
-
-        if safetyCar.justJumped then
-            writeLog("SC: Safety Car has just jumped")
-            showFlags = false
-        end
+        --nixing this check as it fucked us up and I don't think we need it
+        --if safetyCar.justJumped then
+        --    writeLog("SC: Safety Car has just jumped")
+        --    showFlags = false
+        --end
     
         --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
         ac.debug("SC FLags: showFlags", showFlags)
@@ -1070,6 +1071,9 @@ function script.update(dt)
                 scCleared = false
                 writeLog("SC: Gone green - Flags off")
                 timeToDisplayGreenAccumulator = timeAccumulator
+                
+                --TODO: Add this reInitialize here to reset all values once flags disapear?
+                --reInitailizeVars()
             end
         end
         --[[ 
@@ -1105,10 +1109,9 @@ function script.update(dt)
         -- Go green individually end
         --######################
         ]]
-
         
         --######################
-        -- Go green same time
+        -- Get lap counts when SC called in
         if getCarLapCounts then
             for i, car in ac.iterateCars.leaderboard() do
                 -- Edge case - ignore straglers who might be behind Start Finish but ahead of SC when it clears
@@ -1124,6 +1127,8 @@ function script.update(dt)
             getCarLapCounts = false
         end
 
+        --######################
+        -- Go green same time
         if checkGoGreen then
             if raceLeaderCar ~=nil and raceLeaderCar.lapCount > carLapCounts[raceLeaderCar.index] then
                 writeLog("SC: Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
@@ -1134,18 +1139,23 @@ function script.update(dt)
                 scLeaderText = scLeaderTextState.off
                 scHelperText = scHelperTextState.off
 
+                --TODO
+                --Do this in SC script?
+                --How do we log this with online scripts?
+                --
                 if rollingStart then
                     -- Penalize speeding
                     --TODO: Add UI text element
                     local penalty = 0
-                    if driverCarSpeed > 160 then penalty = 180
-                    elseif driverCarSpeed > 140 then penalty = 60
-                    elseif driverCarSpeed > 120 then penalty = 45
-                    elseif driverCarSpeed > 110 then penalty = 15
-                    elseif driverCarSpeed > 102 then penalty = 5
+                    driverCarSpeed = math.floor(driverCar.speedKmh * 10) / 10
+                    if driverCarSpeed > 160 then penalty = 90
+                    elseif driverCarSpeed > 140 then penalty = 45
+                    elseif driverCarSpeed > 120 then penalty = 20
+                    elseif driverCarSpeed > 110 then penalty = 10
+                    elseif driverCarSpeed > 105 then penalty = 5
                     end
                     if penalty > 0 then
-                        ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
+                        --ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
                         writeLog("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
                     end
                 end
@@ -1157,20 +1167,22 @@ function script.update(dt)
                 showFlags = true
                 goGreen = true
                 checkGoGreen = false
-                rollingStart = false
+                
                 conditionsMet = false
 
                 timeToDisplayGreenAccumulator = timeAccumulator
 
                 if driverCar ~= nil and raceLeaderCar ~= nil then
-                    if driverCar == raceLeaderCar then
-                        if rollingStart then
-                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName())
-                        else
-                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName())
-                        end
+                    local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
+                    local timeLeft = sim.sessionTimeLeft
+                    if rollingStart then
+                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. raceLeaderCar:driverName() .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
+                    else
+                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. raceLeaderCar:driverName() .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
                     end
                 end
+
+                rollingStart = false
 
                 
             end
