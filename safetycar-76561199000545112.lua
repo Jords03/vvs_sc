@@ -862,7 +862,7 @@ function script.update(dt)
                 ac.sendChatMessage("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
                 setPitInSpeed()
-
+                checkLeaderPos = true
                 -- TODO: Is this needed - prob not anymore
                 local lc, lcDistance = getLeadingCarBehindSC()
                 if lc then
