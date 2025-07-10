@@ -18,7 +18,6 @@ end
 local function initializeSSStates()
     timeAccumulator = 0
     waitingToStartTimerOn = 0
-    waitingToStart = false
     waitingToTeleport = false
    
 end
