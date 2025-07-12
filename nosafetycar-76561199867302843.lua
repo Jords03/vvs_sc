@@ -7,8 +7,8 @@ SCRIPT_VERSION_CODE = 00001
 local timeAccumulator
 
 -- Session start variables
-local waitingToStartTimerOn
-local waitingToTeleport
+local waitingToInitTimer
+local waitingToInit
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
@@ -17,28 +17,26 @@ end
 
 local function initializeSSStates()
     timeAccumulator = 0
-    waitingToStartTimerOn = 0
-    waitingToTeleport = false
+    waitingToInitTimer = 0
+    waitingToInit = false
    
 end
 
 local function initializeSCScript()
     writeLog("SC: Safety Car Script Initialized")
 
-    if ac.tryToTeleportToPits() then
-        writeLog("SC: Safety Car Script Initialized")
-        if ac.tryToOpenRaceMenu(nil) then
-            writeLog("SC: Race Menu opened")
-        end
+    if ac.tryToOpenRaceMenu(nil) then
+        writeLog("SC: Race Menu opened")
         if ac.disableQuickMenuPitstop(true) then
             writeLog("SC: menu disabled")
+        else
+            writeLog("SC: Disable menu failed. Retrying...")
+            waitingToInit = true
         end
-
     else
-        writeLog("SC: Teleport to pits failed. Retrying...")
-        waitingToTeleport = true
+        writeLog("SC: Race Menu failed to open. Retrying...")
+        waitingToInit = true
     end
-
 end
 
 function script.update(dt)
@@ -49,11 +47,22 @@ function script.update(dt)
    
 
     -- Session start sanity checks - if we are in a wait state and we have gone more than 1 second then reissue the command and reset the 1s timer
-    if waitingToTeleport then
-        if timeAccumulator - waitingToStartTimerOn >= 1 then
-            if ac.tryToTeleportToPits() then
-                waitingToTeleport = false
-                writeLog("NOSC: Backup Teleportation to pit successful")
+    if waitingToInit then
+        if timeAccumulator - waitingToInitTimer >= 1 then
+            if ac.tryToOpenRaceMenu(nil) then
+                writeLog("SC: Race Menu opened")
+                if ac.disableQuickMenuPitstop(true) then
+                    writeLog("SC: menu disabled")
+                    waitingToInit = false
+                else
+                    writeLog("SC: Disable menu failed. Retrying...")
+                    waitingToInit = true
+                    waitingToInitTimer = timeAccumulator
+                end
+            else
+                writeLog("SC: Race Menu failed to open. Retrying...")
+                waitingToInit = true
+                waitingToInitTimer = timeAccumulator
             end
         end
     end
