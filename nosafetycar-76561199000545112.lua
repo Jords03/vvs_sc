@@ -63,6 +63,7 @@ function script.update(dt)
                         writeLog("SC: menu disabled")
                         waitingToInit = false
                     else
+                        waitingToInit = false
                         writeLog("SC: Disable menu failed. Retrying...")
                         waitingToInitTimer = timeAccumulator
                     end
