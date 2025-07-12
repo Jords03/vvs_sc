@@ -43,6 +43,8 @@ local function initializeSCScript()
         writeLog("SC: Teleport to pits failed. Retrying...")
         waitingToInit = true
     end
+
+    waitingToInit = false
 end
 
 function script.update(dt)
