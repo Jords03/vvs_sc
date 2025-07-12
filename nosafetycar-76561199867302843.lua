@@ -26,8 +26,13 @@ local function initializeSCScript()
     writeLog("SC: Safety Car Script Initialized")
 
     if ac.tryToTeleportToPits() then
-        ac.tryToOpenRaceMenu(nil)
-        ac.disableQuickMenuPitstop(true)
+        writeLog("SC: Safety Car Script Initialized")
+        if ac.tryToOpenRaceMenu(nil) then
+            writeLog("SC: Race Menu opened")
+        end
+        if ac.disableQuickMenuPitstop(true) then
+            writeLog("SC: menu disabled")
+        end
 
     else
         writeLog("SC: Teleport to pits failed. Retrying...")
