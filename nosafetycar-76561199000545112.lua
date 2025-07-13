@@ -29,8 +29,14 @@ local function initializeSCScript()
         writeLog("SC: Teleport to pits successful")
         if ac.tryToOpenRaceMenu(nil) then
             writeLog("SC: Race Menu opened")
+            if ac.tryToStart() then
+                writeLog("SC: Started - init successful")
+            else
+                writeLog("SC: Start failed. Retrying...")
+                waitingToInit = true
+            end
         else
-            writeLog("SC: Race Menu failed to open. Retrying...")
+            writeLog("SC: Race Menu failed to open. Retrying...")    
             waitingToInit = true
         end
     else
@@ -52,15 +58,20 @@ function script.update(dt)
             if ac.tryToTeleportToPits() then
                 writeLog("SC: Teleport to pits successful")
                 if ac.tryToOpenRaceMenu(nil) then
-                    writeLog("SC: Race Menu opened")
-                    waitingToInit = false
+                    writeLog("SC: Race Menu disabled")
+                    if ac.tryToStart() then
+                        writeLog("SC: Started - init successful")
+                        waitingToInit = false
+                    else
+                        writeLog("SC: Start failed. Retrying...")
+                    end
                 else
-                    writeLog("SC: Race Menu failed to open. Retrying...")
-                    waitingToInitTimer = timeAccumulator
+                    writeLog("SC: Race Menu failed to disable. Retrying...")
                 end
             else
                 writeLog("SC: Teleport to pits failed. Retrying...")
             end
+            waitingToInitTimer = timeAccumulator
         end
     end
 
