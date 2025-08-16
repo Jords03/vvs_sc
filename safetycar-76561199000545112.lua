@@ -376,7 +376,7 @@ local function initializeSCScript()
 
     -- Set track length dependent thresholds
     if trackLength >= 3500 then
-        SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
+        SC_CALLIN_THRESHOLD_START = 1 - (750 / trackLength)
     end
     SC_CALLIN_THRESHOLD_END = SC_CALLIN_THRESHOLD_START + 0.25
 end
@@ -923,3 +923,4 @@ end)
 
 initializeSSStates()
 initializeSCScript()
+
