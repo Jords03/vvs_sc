@@ -397,7 +397,7 @@ local function callSafetyCar()
 
         --jump the safety car
         writeLog("jumping safety car")
-        physics.setCarPosition(safetyCar.index, safetyCar.position, vec3(1,0,0))
+        --physics.setCarPosition(safetyCar.index, safetyCar.position, vec3(1,0,0))
         writeLog("safety car jumped")
         --physics.setCarPosition(safetyCar.index, safetyCar.position:add(-1,0,0), vec3(1,0,0))
 
