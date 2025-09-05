@@ -107,7 +107,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |A| " .. message)
+    ac.log(timeStamp .. " |B| " .. message)
 end
 
 local function getSafetyCar()
@@ -365,6 +365,14 @@ local function jumpSCToStartLine()
     writeLog("SC: Jumping SC to start line to rectify borking")
 
     local scTrackPos = 0
+
+    local function normalize_position(C, L, R)
+        if C <= L then
+            return -1 + (C / L)  -- Map to -1 to 0
+        else
+            return 0 + ((C - L) / R)  -- Map to 0 to +1
+        end
+    end
     
     -- Get track sides and calculate total track width
     local scTrackSides = ac.getTrackAISplineSides(scTrackPos)
