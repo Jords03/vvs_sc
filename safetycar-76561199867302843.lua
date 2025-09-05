@@ -103,7 +103,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |K " .. message)
+    ac.log(timeStamp .. " |M " .. message)
 end
 
 local function getSafetyCar()
@@ -471,6 +471,7 @@ local function processChatMessage(message, senderCarIndex)
             setSCRollingValues()
         elseif message == "SC stop" then
             physics.setCarAutopilot(false, false)
+            local carPosition = safetyCar.position
             writeLog("Car Pos: " .. carPosition.x .. "," .. carPosition.y .. "," .. carPosition.z)
         elseif message == "SC scoff" then
             scManualCallIn = true
