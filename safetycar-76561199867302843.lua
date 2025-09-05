@@ -103,7 +103,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |D " .. message)
+    ac.log(timeStamp .. " |E " .. message)
 end
 
 local function getSafetyCar()
