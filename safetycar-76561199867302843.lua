@@ -418,9 +418,10 @@ local function callSafetyCarWithJump()
         scInPitLane = true
 
         --jump the safety car
-        writeLog("jumping safety car")
+        writeLog("jumping safety car2")
 
         local carPosition = safetyCar.position
+        
         writeLog("Car Pos: " .. carPosition.x .. "," .. carPosition.y .. "," .. carPosition.z)
 
         -- Calculate world coordinate
