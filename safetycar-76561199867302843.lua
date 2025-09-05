@@ -103,7 +103,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |B " .. message)
+    ac.log(timeStamp .. " |C " .. message)
 end
 
 local function getSafetyCar()
@@ -428,7 +428,7 @@ local function callSafetyCarWithJump()
         local trackProgress = ac.worldCoordinateToTrackProgress(carPosition)
         local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
 
-        local newPosition = vec3(carPosition.x + 3, carPosition.y + 0.2, carPosition.z - 30)
+        local newPosition = vec3(carPosition.x + 5, carPosition.y + 0.2, carPosition.z - 30)
         
         writeLog("New World Dir: " .. worldDirection.x .. "," .. worldDirection.y .. "," .. worldDirection.z)
         
@@ -463,6 +463,8 @@ local function processChatMessage(message, senderCarIndex)
         elseif message == "SC sconj" then
             callSafetyCarWithJump()
             writeLog("SC: SC sconj received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
+        elseif message == "SC jump" then
+            jumpSCtoStart()
         elseif message == "SC scoff" then
             scManualCallIn = true
             --rollingStart = false
