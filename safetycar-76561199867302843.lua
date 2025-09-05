@@ -98,12 +98,16 @@ local raceLeader
 local resetBrakeInPitHack
 local resetBrakeInPitHackSuccess
 
+local scBorkedCheckTimer
+local scBorked
+local scBorkedStartTime
+
 --spline positions for easy lookup
 local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |N " .. message)
+    ac.log(timeStamp .. " |A| " .. message)
 end
 
 local function getSafetyCar()
@@ -219,6 +223,10 @@ local function initializeSSStates()
     raceLeader = nil
     resetBrakeInPitHack = false
     resetBrakeInPitHackSuccess = false
+
+    scBorkedCheckTimer = -1
+    scBorked = false
+    scBorkedStartTime = -1
 
     trustableSplinePostionsById = {}
 
@@ -352,6 +360,31 @@ local function jumpSCtoStart()
     ]]
 end
 
+
+local function jumpSCToStartLine()
+    writeLog("SC: Jumping SC to start line to rectify borking")
+
+    local scTrackPos = 0
+    
+    -- Get track sides and calculate total track width
+    local scTrackSides = ac.getTrackAISplineSides(scTrackPos)
+    local leftDistance = scTrackSides.x
+    local rightDistance = scTrackSides.y
+    local trackCenter = (leftDistance + rightDistance) / 2
+    local normalizedTrackCenter = normalize_position(trackCenter, leftDistance, rightDistance)
+
+    -- Calculate world coordinates
+    local scTrackProgressWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, scTrackPos))
+
+    local trackProgress = ac.worldCoordinateToTrackProgress(scTrackProgressWorld)
+    local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
+
+    -- Set the safety car position and orientation
+    physics.setCarPosition(safetyCar.index, scTrackProgressWorld, worldDirection)
+
+end
+
+
 local function initializeSCScript()
     writeLog("SC: Safety Car Script Initialized")
 
@@ -397,51 +430,7 @@ local function callSafetyCar()
 
         setSCValues(safetyCarPitLaneSpeed)
         setSCLights("on")
-    else
-        writeLog("SC: Safety Car cannot be deployed - too late in race")
-    end
-end
-
---XXXXXXJUMP
-local function callSafetyCarWithJump()
-    if not ensureSimAndSafetyCar() then return end
-    if scActive and not rollingStart then
-        if safetyCar.isInPitlane and not safetyCar.isInPit then
-            writeLog("SC: Re-initialization while in pitlane")
-            initializeSSStates()
-            initializeSCScript()
-        end
-        writeLog("SC: Safety Car is being called")
-        scRequested = true
-        scHeadingToPit = false
-        scOnTrack = false
-        scInPitLane = true
-
-        --jump the safety car
-        writeLog("jumping safety car6")
-
-        local carPosition = safetyCar.position
-        
-        writeLog("Car Pos: " .. carPosition.x .. "," .. carPosition.y .. "," .. carPosition.z)
-
-        -- Calculate world coordinate
-        local trackProgress = ac.worldCoordinateToTrackProgress(carPosition)
-        local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
-
-        --local newPosition = vec3(carPosition.x + 35, carPosition.y + 0.5, carPosition.z - 90)
-        local newPosition = vec3(-205.6, 19.03, -476.22)
-        
-        writeLog("New World Dir: " .. worldDirection.x .. "," .. worldDirection.y .. "," .. worldDirection.z)
-        
-        physics.setCarPosition(safetyCar.index, newPosition, worldDirection)
-        --jumpSCtoStart()
-        --physics.setCarPosition(safetyCar.index, carPosition, worldDirection)
-
-        writeLog("safety car jumped")
-        --physics.setCarPosition(safetyCar.index, safetyCar.position:add(-1,0,0), vec3(1,0,0))
-
-        setSCValues(safetyCarPitLaneSpeed)
-        setSCLights("on")
+        scBorkedCheckTimer = timeShortAccumulator
     else
         writeLog("SC: Safety Car cannot be deployed - too late in race")
     end
@@ -462,18 +451,6 @@ local function processChatMessage(message, senderCarIndex)
         if message == "SC scon" then
             callSafetyCar()
             writeLog("SC: SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
-        --XXXXXXJUMP
-        elseif message == "SC sconj" then
-            callSafetyCarWithJump()
-            writeLog("SC: SC sconj received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
-        elseif message == "SC jump" then
-            jumpSCtoStart()
-        elseif message == "SC go" then
-            setSCRollingValues()
-        elseif message == "SC stop" then
-            physics.setCarAutopilot(false, false)
-            local carPosition = safetyCar.position
-            writeLog("Car Pos: " .. carPosition.x .. "," .. carPosition.y .. "," .. carPosition.z)
         elseif message == "SC scoff" then
             scManualCallIn = true
             --rollingStart = false
@@ -681,6 +658,10 @@ local function refreshSplineList()
     end
 end
 
+local function checkNoOneNearSF()
+    return true
+end
+
 function script.update(dt)
 
     -- Total time passed - used for controlling delayed stuff
@@ -763,6 +744,19 @@ function script.update(dt)
         end
     end
 
+    if scBorkedCheckTimer ~= -1 then
+        if timeAccumulator - scBorkedCheckTimer >= 1 then
+            writeLog("SC Borked check")
+            scBorkedCheckTimer = -1
+            if safetyCar.speedMs < 0.2 then
+                writeLog("SC Borked, falling back to jump to track")
+                scBorked = true
+                scBorkedStartTime = timeAccumulator
+            else 
+                writeLog("SC Not Borked, happy days")
+            end
+        end 
+    end
     -- stop if not enough cars connected
     -- if sim.connectedCars < (minConnectedCars + 1) then return end
     -- stop if not race session
@@ -853,6 +847,23 @@ function script.update(dt)
 
     -- Things we do every 1 (short) seconds
     if timeAccumulator - timeShortAccumulator >= timeShort then
+
+        if scRequested and not scOnTrack and scBorked then
+            --if 2 mins have passed then abort
+            if scBorkedStartTime - timeAccumulator >= 120 then
+                scBorked = false
+                writeLog("Did not find a space to deploy borked SC after 2 minutes, aborting")
+            else
+                --check no-one is near the S/F
+                if checkNoOneNearSF() then
+                    --jump the SC to the start finish line
+                    scBorked = false
+                    writeLog("Track clear, jumping SC to start finish")
+                    jumpSCToStartLine()
+                end
+            end
+        end
+
         -- Hacky force braking in pit
         if resetBrakeInPitHackSuccess then
             physics.setCarAutopilot(true, false)
