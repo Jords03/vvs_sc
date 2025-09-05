@@ -428,7 +428,7 @@ local function callSafetyCarWithJump()
         local trackProgress = ac.worldCoordinateToTrackProgress(carPosition)
         local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
 
-        local newPosition = vec3(carPosition.x + 2, carPosition.y + 2, carPosition.z - 20)
+        local newPosition = vec3(carPosition.x + 3, carPosition.y + 0.2, carPosition.z - 30)
         
         writeLog("New World Dir: " .. worldDirection.x .. "," .. worldDirection.y .. "," .. worldDirection.z)
         
