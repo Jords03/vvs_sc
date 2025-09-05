@@ -107,7 +107,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |B| " .. message)
+    ac.log(timeStamp .. " |C| " .. message)
 end
 
 local function getSafetyCar()
@@ -667,6 +667,18 @@ local function refreshSplineList()
 end
 
 local function checkNoOneNearSF()
+
+    local scTrackPosMax = 1 - (400 / sim.trackLengthM)
+    local scTrackPosMin = 50 / sim.trackLengthM
+
+    for i, car in ac.iterateCars.ordered() do
+        if car ~= safetyCar then
+            if car.splinePosition < scTrackPosMin or car.splinePosition > scTrackPosMax then
+                return false
+            end
+        end
+    end
+
     return true
 end
 
@@ -753,7 +765,7 @@ function script.update(dt)
     end
 
     if scBorkedCheckTimer ~= -1 then
-        if timeAccumulator - scBorkedCheckTimer >= 1 then
+        if timeAccumulator - scBorkedCheckTimer >= 2 then
             writeLog("SC Borked check")
             scBorkedCheckTimer = -1
             if safetyCar.speedMs < 0.2 then
