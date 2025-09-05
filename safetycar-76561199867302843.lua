@@ -103,7 +103,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |G " .. message)
+    ac.log(timeStamp .. " |H " .. message)
 end
 
 local function getSafetyCar()
@@ -428,7 +428,7 @@ local function callSafetyCarWithJump()
         local trackProgress = ac.worldCoordinateToTrackProgress(carPosition)
         local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
 
-        local newPosition = vec3(carPosition.x + 7, carPosition.y + 0.2, carPosition.z - 30)
+        local newPosition = vec3(carPosition.x + 21, carPosition.y + 0.5, carPosition.z - 90)
         
         writeLog("New World Dir: " .. worldDirection.x .. "," .. worldDirection.y .. "," .. worldDirection.z)
         
