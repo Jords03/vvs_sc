@@ -103,7 +103,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |E " .. message)
+    ac.log(timeStamp .. " |F " .. message)
 end
 
 local function getSafetyCar()
@@ -432,9 +432,9 @@ local function callSafetyCarWithJump()
         
         writeLog("New World Dir: " .. worldDirection.x .. "," .. worldDirection.y .. "," .. worldDirection.z)
         
-        --physics.setCarPosition(safetyCar.index, newPosition, worldDirection)
-        jumpSCtoStart()
-        physics.setCarPosition(safetyCar.index, carPosition, worldDirection)
+        physics.setCarPosition(safetyCar.index, newPosition, worldDirection)
+        --jumpSCtoStart()
+        --physics.setCarPosition(safetyCar.index, carPosition, worldDirection)
 
         writeLog("safety car jumped")
         --physics.setCarPosition(safetyCar.index, safetyCar.position:add(-1,0,0), vec3(1,0,0))
