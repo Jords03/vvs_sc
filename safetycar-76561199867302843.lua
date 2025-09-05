@@ -395,9 +395,42 @@ local function callSafetyCar()
         scOnTrack = false
         scInPitLane = true
 
+        setSCValues(safetyCarPitLaneSpeed)
+        setSCLights("on")
+    else
+        writeLog("SC: Safety Car cannot be deployed - too late in race")
+    end
+end
+
+--XXXXXXJUMP
+local function callSafetyCarWithJump()
+    if not ensureSimAndSafetyCar() then return end
+    if scActive and not rollingStart then
+        if safetyCar.isInPitlane and not safetyCar.isInPit then
+            writeLog("SC: Re-initialization while in pitlane")
+            initializeSSStates()
+            initializeSCScript()
+        end
+        writeLog("SC: Safety Car is being called")
+        scRequested = true
+        scHeadingToPit = false
+        scOnTrack = false
+        scInPitLane = true
+
         --jump the safety car
         writeLog("jumping safety car")
-        --physics.setCarPosition(safetyCar.index, safetyCar.position, vec3(1,0,0))
+
+        local carPosition = safetyCar.position
+        writeLog("Car Pos: " + carPosition.x + "," + carPosition.y + "," + carPosition.z)
+
+        -- Calculate world coordinate
+        local trackProgress = ac.worldCoordinateToTrackProgress(carPosition)
+        local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
+        
+        writeLog("New World Dir: " + worldDirection.x + "," + worldDirection.y + "," + worldDirection.z)
+        
+        physics.setCarPosition(safetyCar.index, safetyCar.position, worldDirection)
+
         writeLog("safety car jumped")
         --physics.setCarPosition(safetyCar.index, safetyCar.position:add(-1,0,0), vec3(1,0,0))
 
@@ -423,6 +456,10 @@ local function processChatMessage(message, senderCarIndex)
         if message == "SC scon" then
             callSafetyCar()
             writeLog("SC: SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
+        --XXXXXXJUMP
+        elseif message == "SC sconj" then
+            callSafetyCarWithJump()
+            writeLog("SC: SC sconj received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
         elseif message == "SC scoff" then
             scManualCallIn = true
             --rollingStart = false
