@@ -107,7 +107,7 @@ local trustableSplinePostionsById = {}
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |C| " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 local function getSafetyCar()
@@ -870,7 +870,7 @@ function script.update(dt)
 
         if scRequested and not scOnTrack and scBorked then
             --if 2 mins have passed then abort
-            if scBorkedStartTime - timeAccumulator >= 120 then
+            if timeAccumulator - scBorkedStartTime >= 120 then
                 scBorked = false
                 writeLog("Did not find a space to deploy borked SC after 2 minutes, aborting")
             else
