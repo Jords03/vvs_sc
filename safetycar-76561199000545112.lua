@@ -474,6 +474,12 @@ local function processChatMessage(message, senderCarIndex)
             jumpSCtoStart()
             rollingStart = true
             waitingToRollingStart = true
+        elseif message == "SC teston" then
+            writeLog("SC: Safety Car Test On")
+            ac.sendChatMessage("SC: Test On")
+        elseif message == "SC testoff" then
+            writeLog("SC: Safety Car Test Off")
+            ac.sendChatMessage("SC: Test Off")
         end
     end
     return true
