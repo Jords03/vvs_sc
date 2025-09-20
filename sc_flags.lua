@@ -27,13 +27,15 @@ local scState = {
     inPit = "IN PITBOX",
     getReady = "GET READY",
     rollingStart = "ROLLING START",
+    test = "TEST",
     off = "",
     settings = "SETTINGS"
 }
 
 local scHeadingTextState = {
     sc = "SAFETY CAR",
-    green = "GREEN FLAG"
+    green = "GREEN FLAG",
+    test = "TEST"
 }
 
 local scRollingTextState = {
@@ -58,6 +60,7 @@ local scHelperTextState = {
     erratic = "DON'T DRIVE ERRATICALLY",
     passSafetyCar = "PASS SAFETY CAR - CATCH PACK",
     noOvertake = "NO OVERTAKING",
+    test = "TEST",
     off = ""
 }
 
@@ -364,6 +367,31 @@ local function setRollingStartConditions()
     goGreen = false
 end
 
+local function scTestOn()
+    writeLog("SC: Recieved - Test On")
+    flagColor = rgbm.colors.yellow
+    scTextColor = rgbm.colors.black
+    scHeadingTextColor = rgbm.colors.yellow
+    scStatusText = scState.test
+    scHeadingText = scHeadingTextState.test
+    --scLeaderText = scLeaderTextState.leader
+    headingToPits = false
+    conditionsMet = false
+    rollingStart = false
+    scCleared = false
+    showFlags = true
+    goGreen = false
+    scOnTrack = true
+    audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
+    audioSCDeployedEvent.volume = 5
+    audioSCDeployedEvent:start()    
+end
+
+local function scTestOff()
+    writeLog("SC: Recieved - Test Off")
+    initializeSCFlagScript()
+end
+
 local function scDeployed()
     writeLog("SC: Recieved - Safety Car deployed")
     flagColor = rgbm.colors.yellow
@@ -476,6 +504,10 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             elseif message == "SC kill" then
                 initializeSCFlagScript()
                 writeLog("SC: Recieved - SC kill")
+            elseif message == "SC: Test On" then
+                scTestOn()
+            elseif message == "SC: Test Off" then
+                scTestOff()
             end
         end
     end
