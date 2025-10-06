@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " A| " .. message)
 end
 
 --get the id of the SC
@@ -523,10 +523,10 @@ local function updateCarStatuses()
             -- Update pit times or retirement status
             if car.speedKmh > 10 then
                 if car.isInPitlane then
-                    writeLog("SC: " .. car:driverName() .. " is in pitlane")
+                    --writeLog("SC: " .. car:driverName() .. " is in pitlane")
                     carsInPit = carsInPit + 1
                 else
-                    writeLog("SC: " .. car:driverName() .. " is on track")
+                    --writeLog("SC: " .. car:driverName() .. " is on track")
                     activeCarArray[activeCarCount] = car
                     activeCarCount = activeCarCount + 1
 
