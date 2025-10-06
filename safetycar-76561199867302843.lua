@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.1"
-SCRIPT_VERSION_CODE = 00001
+SCRIPT_VERSION = "0.0.0.2"
+SCRIPT_VERSION_CODE = 00002
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |K " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 --get the id of the SC
@@ -1023,7 +1023,7 @@ function script.update(dt)
     end
 
     
-    if scHeadingToPit and safetyCar.isInPit  then
+    if scHeadingToPit and safetyCar.isInPit then
 
         writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
         writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
@@ -1031,14 +1031,14 @@ function script.update(dt)
         
         -- Reset SC once entering pit box
         writeLog("RESET IN BOX TELEPORT - teleporting attempt")
-        --physics.setCarAutopilot(false, false)
-        --if ac.tryToTeleportToPits() then
-        --    if ac.tryToStart() then
-        --        writeLog("SC: SC reset in pits successful")
-        --    else
-        --        writeLog("SC: SC reset in pits failed")
-        --    end
-        --end
+        physics.setCarAutopilot(false, false)
+        if ac.tryToTeleportToPits() then
+            if ac.tryToStart() then
+                writeLog("SC: SC reset in pits successful")
+            else
+                writeLog("SC: SC reset in pits failed")
+            end
+        end
 
         scHeadingToPit = false
         scRequested = false
