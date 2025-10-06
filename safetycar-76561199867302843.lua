@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " A| " .. message)
 end
 
 --get the id of the SC
@@ -480,6 +480,7 @@ local function processChatMessage(message, senderCarIndex)
             writeLog("SC: Safety Car Test Off")
             sendMessageWithAck("SC: Test Off")
         elseif message == "SC ack" then
+            writeLog("SC: ACK Received")
             waitForAckTimer = -1
             lastMessage = ""
         end
@@ -763,7 +764,7 @@ function script.update(dt)
 
     --are we waiting for an ACK message?
     if waitForAckTimer ~= -1 then
-        if timeAccumulator - waitForAckTimer > 1 then
+        if timeAccumulator - waitForAckTimer > 2 then
             writeLog("NO ACK RECEIVED, RESENDING MESSAGE")
             sendMessageWithAck(lastMessage)
         end
