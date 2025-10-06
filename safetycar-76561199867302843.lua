@@ -102,14 +102,19 @@ local scBorkedCheckTimer
 local scBorked
 local scBorkedStartTime
 
+local waitForAckTimer = -1
+local lastMessage = ""
+
 --spline positions for easy lookup
 local trustableSplinePostionsById = {}
 
+--utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
     ac.log(timeStamp .. " | " .. message)
 end
 
+--get the id of the SC
 local function getSafetyCar()
     safetyCarID = ac.getCarByDriverName(safetyCarName)
     if safetyCarID then
@@ -120,6 +125,7 @@ local function getSafetyCar()
     return nil
 end
 
+--populate table of admin car IDs
 local function getAdminCar()
     for i,v in ipairs(adminNames) do
         adminCarID = ac.getCarByDriverName(v)
@@ -133,26 +139,17 @@ local function getAdminCar()
     return nil
 end
 
-
+--verify we are initialised and have the SC identifier
 local function ensureSimAndSafetyCar()
     if not sim or not safetyCar then
         writeLog("SC: sim or safetyCar is nil")
         return false
     end
-    --[[
-    if sim.raceSessionType ~= 3 then
-        writeLog("SC: Not a race session = " .. sim.raceSessionType)
-        return false
-    end
-    ]]
-    --[[ if sim.connectedCars < (minConnectedCars + 1) then
-        writeLog("SC: Not enough cars connected")
-        return false
-    end ]]
 
     return true
 end
 
+--(re)init all variables
 local function initializeSSStates()
     -- Get states
     sim = ac.getSim()
@@ -170,15 +167,12 @@ local function initializeSSStates()
     scLeadDistThresholdMin = 120 -- update to adjust to speed of leader
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 28 -- multiplier for distance behind SC N x carSpacing
-    inPitTimeLimit = 120 -- seconds
     carsInPit = 0
     activeCarCount = 0
     activeCarArray = {}
-    retiredCars = {}
     previousGapToSC = {}
     carsNotGainingOnSC = 0
     gainingTimeThreshold = 2
-    minConnectedCars = 1
 
     -- Time accumulators
     timeHalfSec = 0.5 -- seconds
@@ -224,6 +218,7 @@ local function initializeSSStates()
     resetBrakeInPitHack = false
     resetBrakeInPitHackSuccess = false
 
+    --variables for jumping SC out if it gets stuck
     scBorkedCheckTimer = -1
     scBorked = false
     scBorkedStartTime = -1
@@ -232,7 +227,7 @@ local function initializeSSStates()
 
 end
 
-
+--set SC to given speed
 local function setSCValues(scSpeed)    
     physics.setCarAutopilot(true, false)
     physics.setAIPitStopRequest(safetyCar.index, false)
@@ -242,25 +237,19 @@ local function setSCValues(scSpeed)
     writeLog("SC: SC values set")
 end
 
-local resetSCValues = function()
-    physics.setCarAutopilot(false, false)
-    physics.setAIPitStopRequest(safetyCar.index, false)
-    physics.setAIThrottleLimit(safetyCar.index, 0.65)
-    physics.setAITopSpeed(safetyCar.index, safetyCarSpeed)
-    physics.setAIAggression(safetyCar.index, 0.8)
-    writeLog("SC: SC values reset")
-end
-
+--set to max speed
 local function setSCSpeedUpValue()
     physics.setAITopSpeed(safetyCar.index, safetyCarSpeed)
 end
 
+--tell SC to come in
 local function setSCRequestPit()
     physics.setCarAutopilot(true, false)
     physics.setAITopSpeed(safetyCar.index, safetyCarInSpeed)
     physics.setAIPitStopRequest(safetyCar.index, true)
 end
 
+--set SC for rolling start
 local function setSCRollingValues()
     physics.setCarAutopilot(true, false)
     --physics.setAIPitStopRequest(safetyCar.index, true)
@@ -269,6 +258,7 @@ local function setSCRollingValues()
     physics.setAIAggression(safetyCar.index, 0.8)
 end
 
+--set pit in speed for SC
 local function setPitInSpeed()
     physics.setAITopSpeed(safetyCar.index, safetyCarPitInSpeed)
     physics.setAIPitStopRequest(safetyCar.index, true)
@@ -277,15 +267,9 @@ local function setPitInSpeed()
     resetBrakeInPitHack = true
 end
 
+--turn SC lights on / off
 local function setSCLights(state)
     if state == "on" then
-        --[[ if scOnTrack then
-            ac.setExtraSwitch(0, false)
-            ac.setExtraSwitch(1, true)
-        else
-            ac.setExtraSwitch(0, true)
-            ac.setExtraSwitch(1, false)
-        end ]]
         ac.setExtraSwitch(0, true)
         ac.setExtraSwitch(1, true)
     elseif state == "off" then
@@ -294,6 +278,7 @@ local function setSCLights(state)
     end
 end
 
+--Jump SC to strart line for rolling start
 local function jumpSCtoStart()
     writeLog("SC: Jumping SC to start")
     local scMetersAhead = 25
@@ -360,7 +345,7 @@ local function jumpSCtoStart()
     ]]
 end
 
-
+--jump SC to start line to rectify stuck issues
 local function jumpSCToStartLine()
     writeLog("SC: Jumping SC to start line to rectify borking")
 
@@ -392,7 +377,7 @@ local function jumpSCToStartLine()
 
 end
 
-
+--init SC, make sure it is in the pit box
 local function initializeSCScript()
     writeLog("SC: Safety Car Script Initialized")
 
@@ -422,15 +407,21 @@ local function initializeSCScript()
     end
 end
 
+--call SC out
 local function callSafetyCar()
-    if not ensureSimAndSafetyCar() then return end
+    writeLog("SC: Safety Car is being called")
+    if not ensureSimAndSafetyCar() then 
+        writeLog("SC: Safety Car Broken!!")
+        return 
+    end
+
     if scActive and not rollingStart then
         if safetyCar.isInPitlane and not safetyCar.isInPit then
             writeLog("SC: Re-initialization while in pitlane")
             initializeSSStates()
             initializeSCScript()
         end
-        writeLog("SC: Safety Car is being called")
+        writeLog("SC: Safety Car is being called out")
         scRequested = true
         scHeadingToPit = false
         scOnTrack = false
@@ -444,6 +435,7 @@ local function callSafetyCar()
     end
 end
 
+--utility function to check if a value is in a table
 local function tableContains(testTable, value)
     for i = 1,#testTable do
       if (testTable[i] == value) then
@@ -452,6 +444,13 @@ local function tableContains(testTable, value)
     end
     return false
   end
+
+--send SC message and wait for ACK message
+local function sendMessageWithAck(message)
+    waitForAckTimer = timeAccumulator
+    lastMessage = message
+    ac.sendChatMessage(message)
+end
 
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
@@ -476,19 +475,25 @@ local function processChatMessage(message, senderCarIndex)
             waitingToRollingStart = true
         elseif message == "SC teston" then
             writeLog("SC: Safety Car Test On")
-            ac.sendChatMessage("SC: Test On")
+            sendMessageWithAck("SC: Test On")
         elseif message == "SC testoff" then
             writeLog("SC: Safety Car Test Off")
-            ac.sendChatMessage("SC: Test Off")
+            sendMessageWithAck("SC: Test Off")
+        elseif message == "SC ack" then
+            waitForAckTimer = -1
+            lastMessage = ""
         end
     end
     return true
 end
 
+--triggered when a message is received
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     writeLog("SC: Chat Msg: " .. message .. " | Car ID: " .. senderCarIndex)
     return processChatMessage(message, senderCarIndex)
 end)
+
+
 
 -- Calculate the normalized distance between two cars in forward direction ahead
 local function calculateDistanceToSC(carPosition, car2Position)
@@ -497,6 +502,8 @@ local function calculateDistanceToSC(carPosition, car2Position)
     end
     return car2Position - carPosition  -- Always a value between 0 and 1
 end
+
+
 
 -- Update car statuses and gaps to SC
 local function updateCarStatuses()
@@ -513,10 +520,10 @@ local function updateCarStatuses()
             -- Update pit times or retirement status
             if car.speedKmh > 10 then
                 if car.isInPitlane then
-                    ac.debug("SC: " .. car:driverName() .. " is in pitlane", true)
+                    writeLog("SC: " .. car:driverName() .. " is in pitlane")
                     carsInPit = carsInPit + 1
                 else
-                    ac.debug("SC: " .. car:driverName() .. " is on track", true)
+                    writeLog("SC: " .. car:driverName() .. " is on track")
                     activeCarArray[activeCarCount] = car
                     activeCarCount = activeCarCount + 1
 
@@ -672,6 +679,7 @@ local function refreshSplineList()
     end
 end
 
+--check no one is too near the SF line to let the SC jump out
 local function checkNoOneNearSF()
 
     local scTrackPosMax = 1 - (400 / sim.trackLengthM)
@@ -688,6 +696,7 @@ local function checkNoOneNearSF()
     return true
 end
 
+--called every frame
 function script.update(dt)
 
     -- Total time passed - used for controlling delayed stuff
@@ -752,6 +761,16 @@ function script.update(dt)
         return
     end
 
+    --are we waiting for an ACK message?
+    if waitForAckTimer ~= -1 then
+        if timeAccumulator - waitForAckTimer > 1 then
+            writeLog("NO ACK RECEIVED, RESENDING MESSAGE")
+            sendMessageWithAck(lastMessage)
+        end
+    end
+
+
+
     -- Setting SC rolling start values 30 secs before race start
     if waitingToRollingStart then
         if sim.timeToSessionStart <= 15000 then
@@ -765,7 +784,7 @@ function script.update(dt)
             scHeadingToPit = false
             waitingToRollingStart = false
             checkClosestCarToSC = true
-            ac.sendChatMessage("SC: Safety Car rolling start")
+            sendMessageWithAck("SC: Safety Car rolling start")
             --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
         end
     end
@@ -794,7 +813,7 @@ function script.update(dt)
         -- Runs for a single frame when the SC leaves the pits
         if not scInPitLane and not scOnTrack then
             writeLog("SC: Safety Car deployed")
-            ac.sendChatMessage("SC: Safety Car deployed")
+            sendMessageWithAck("SC: Safety Car deployed")
             scOnTrack = true
             scInPitLane = false
             checkClosestCarToSC = true
@@ -805,7 +824,7 @@ function script.update(dt)
     end
 
     if scManualCallIn then
-        ac.sendChatMessage("SC: Safety Car in this lap")
+        sendMessageWithAck("SC: Safety Car in this lap")
         scManualCallIn = false
     end
 
@@ -838,7 +857,7 @@ function script.update(dt)
             scHeadingToPit = true
             scRequested = false
             setSCRequestPit()
-            ac.sendChatMessage("SC: Safety Car is heading to pits at end of session")
+            sendMessageWithAck("SC: Safety Car is heading to pits at end of session")
         end
 
         ac.debug("timeLongAccumulator", timeLongAccumulator)
@@ -941,7 +960,7 @@ function script.update(dt)
                     or safetyCar.lapCount - scPrevLapCount >= scMaxLapsOut
                     then
                         scConditonsMet = true
-                        ac.sendChatMessage("SC: Safety Car in this lap")
+                        sendMessageWithAck("SC: Safety Car in this lap")
                         writeLog("SC: Conditions met for Safety Car to come in")
                         writeLog("SC: Safety Car in this lap")
                         -- See med timer for call in/heading to pit 
@@ -952,9 +971,32 @@ function script.update(dt)
             end        
         end
         if scHeadingToPit and scOnTrack then
+            --sanity check, if SC speed is 0 then clear it and jump it to pits
+            if safetyCar.speedMs < 0.1 then
+                writeLog("SC: Safety Car has stopped unexpectedly!")
+                if ac.tryToTeleportToPits() then
+                    if ac.tryToStart() then
+                        writeLog("SC: SC reset in pits successful")
+                    else
+                        writeLog("SC: SC reset in pits failed")
+                        waitingToStart = true
+                    end
+                end
+
+                scHeadingToPit = false
+                scRequested = false
+                scOnTrack = false
+                scInPitLane = true
+                scConditonsMet = false
+                rollingStart = false
+                sendMessageWithAck("SC: Safety Car is clear")
+            end
+
+
+
             if safetyCar.isInPitlane then
                 scOnTrack = false
-                ac.sendChatMessage("SC: Safety Car is clear")
+                sendMessageWithAck("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
                 setPitInSpeed()
                 checkLeaderPos = true
