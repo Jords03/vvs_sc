@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " M| " .. message)
 end
 
 --get the id of the SC
@@ -944,6 +944,10 @@ function script.update(dt)
 
     -- Things we do every 0.5 (shorter) seconds
     if timeAccumulator - timeHalfSecAccumulator >= timeHalfSec then
+        --refersh the SC object - not sure why we need this but it doesn't like it otherwise!
+        if safetyCarID then
+            safetyCar = ac.getCar(safetyCarID)
+        end
 
         --check if the SC has been called out
         if sharedData.safetyCarCallout then
@@ -1017,9 +1021,6 @@ function script.update(dt)
 
     
     if scHeadingToPit then
-        if safetyCarID then
-            safetyCar = ac.getCar(safetyCarID)
-        end
         if safetyCar.isInPit  then
             writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
             writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
@@ -1031,8 +1032,6 @@ function script.update(dt)
                     writeLog("SC: SC reset in pits successful")
                 else
                     writeLog("SC: SC reset in pits failed")
-                    writeLog("RESET FAILED - setting waiting to start to true")
-                    waitingToStart = true
                 end
             end
     
