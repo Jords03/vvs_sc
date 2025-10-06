@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " |H " .. message)
+    ac.log(timeStamp .. " |J " .. message)
 end
 
 --get the id of the SC
@@ -389,6 +389,7 @@ local function initializeSCScript()
 
     getAdminCar()
 
+    writeLog("INIT - trying telepot")
     if ac.tryToTeleportToPits() then
         ac.tryToOpenRaceMenu(nil)
         ac.disableQuickMenuPitstop(true)
@@ -731,6 +732,7 @@ function script.update(dt)
     -- Session start sanity checks - if we are in a wait state and we have gone more than 1 second then reissue the command and reset the 1s timer
     if waitingToTeleport then
         if timeAccumulator - waitingToStartTimerOn >= 1 then
+            writeLog("BACKUP TELEPORT - teleporting attempt")
             if ac.tryToTeleportToPits() then
                 waitingToTeleport = false
                 writeLog("BACKUP TELEPORT - setting waitingToStart to true")
@@ -984,6 +986,7 @@ function script.update(dt)
             --sanity check, if SC speed is 0 then clear it and jump it to pits
             if safetyCar.speedMs < 0.0001 then
                 writeLog("SC: Safety Car has stopped unexpectedly!")
+                writeLog("SC STOP - teleporting attempt")
                 if ac.tryToTeleportToPits() then
                     writeLog("SC: SC reset in pits successful")
                 else
@@ -1020,39 +1023,30 @@ function script.update(dt)
     end
 
     
-    if scHeadingToPit then
+    if scHeadingToPit and safetyCar.isInPit  then
 
-        --refersh the SC object - not sure why we need this but it doesn't like it otherwise!
-        if safetyCarID then
-            safetyCar = ac.getCar(safetyCarID)
-        end
-
-        if safetyCar.isInPit  then
-
-            
-
-            writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
-            writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
-            writeLog("SC speed: " .. tostring(safetyCar.speedMs))
-            
-            -- Reset SC once entering pit box
-            physics.setCarAutopilot(false, false)
-            if ac.tryToTeleportToPits() then
-                if ac.tryToStart() then
-                    writeLog("SC: SC reset in pits successful")
-                else
-                    writeLog("SC: SC reset in pits failed")
-                end
+        writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
+        writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
+        writeLog("SC speed: " .. tostring(safetyCar.speedMs))
+        
+        -- Reset SC once entering pit box
+        writeLog("RESET IN BOX TELEPORT - teleporting attempt")
+        physics.setCarAutopilot(false, false)
+        if ac.tryToTeleportToPits() then
+            if ac.tryToStart() then
+                writeLog("SC: SC reset in pits successful")
+            else
+                writeLog("SC: SC reset in pits failed")
             end
-    
-            scHeadingToPit = false
-            scRequested = false
-            scOnTrack = false
-            scInPitLane = true
-            scConditonsMet = false
-            rollingStart = false
-            --ac.sendChatMessage("SC: Safety Car has reset in pits")   
         end
+
+        scHeadingToPit = false
+        scRequested = false
+        scOnTrack = false
+        scInPitLane = true
+        scConditonsMet = false
+        rollingStart = false
+        --ac.sendChatMessage("SC: Safety Car has reset in pits")   
     end
 
     --use leader crossing sf to ensure rollingstart is not set
