@@ -485,11 +485,6 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
         if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
             writeLog("SC: chatmsg: " .. message)
 
-            if message:startsWith("SC:") then
-                writeLog("Sending ack")
-                ac.sendChatMessage("SC ack - " .. message)
-            end
-
             if message == "SC: Safety Car rolling start" then
                 writeLog("SC: Recieved - Safety Car rolling start")
                 setRollingStartConditions()
