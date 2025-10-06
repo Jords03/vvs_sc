@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " M| " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 --get the id of the SC
@@ -944,11 +944,7 @@ function script.update(dt)
 
     -- Things we do every 0.5 (shorter) seconds
     if timeAccumulator - timeHalfSecAccumulator >= timeHalfSec then
-        --refersh the SC object - not sure why we need this but it doesn't like it otherwise!
-        if safetyCarID then
-            safetyCar = ac.getCar(safetyCarID)
-        end
-
+    
         --check if the SC has been called out
         if sharedData.safetyCarCallout then
             sharedData.safetyCarCallout = false
@@ -1021,10 +1017,18 @@ function script.update(dt)
 
     
     if scHeadingToPit then
+
+        --refersh the SC object - not sure why we need this but it doesn't like it otherwise!
+        if safetyCarID then
+            safetyCar = ac.getCar(safetyCarID)
+        end
+
         if safetyCar.isInPit  then
+
             writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
             writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
             writeLog("SC speed: " .. tostring(safetyCar.speedMs))
+            
             -- Reset SC once entering pit box
             physics.setCarAutopilot(false, false)
             if ac.tryToTeleportToPits() then
