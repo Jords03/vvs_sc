@@ -486,7 +486,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             writeLog("SC: chatmsg: " .. message)
 
             if message:startsWith("SC:") then
-                ac.sendChatMessage("SC ack")
+                writeLog("Sending ack")
+                ac.sendChatMessage("SC ack - " .. message)
             end
 
             if message == "SC: Safety Car rolling start" then
