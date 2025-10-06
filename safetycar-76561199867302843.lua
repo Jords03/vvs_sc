@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " A| " .. message)
 end
 
 --get the id of the SC
@@ -954,20 +954,22 @@ function script.update(dt)
             if scOnTrack and not scConditonsMet then
                 local scSplinePos = trustableSplinePostionsById[safetyCar.index]
                 -- TODO: Ask Nigel to if we can get PitLane Spline?
-                if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
-                    ac.debug("SC: Safety Car within threshold", true)
-                    if canSafetyCarComeIn()
-                    or rollingStart
-                    or safetyCar.lapCount - scPrevLapCount >= scMaxLapsOut
-                    then
-                        scConditonsMet = true
-                        sendMessageWithRetry("SC: Safety Car in this lap")
-                        writeLog("SC: Conditions met for Safety Car to come in")
-                        writeLog("SC: Safety Car in this lap")
-                        -- See med timer for call in/heading to pit 
+                if scSplinePos ~= nil then
+                    if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
+                        ac.debug("SC: Safety Car within threshold", true)
+                        if canSafetyCarComeIn()
+                        or rollingStart
+                        or safetyCar.lapCount - scPrevLapCount >= scMaxLapsOut
+                        then
+                            scConditonsMet = true
+                            sendMessageWithRetry("SC: Safety Car in this lap")
+                            writeLog("SC: Conditions met for Safety Car to come in")
+                            writeLog("SC: Safety Car in this lap")
+                            -- See med timer for call in/heading to pit 
+                        end
+                    else
+                        ac.debug("SC: Safety Car within threshold", false)
                     end
-                else
-                    ac.debug("SC: Safety Car within threshold", false)
                 end
             end        
         end
@@ -976,12 +978,9 @@ function script.update(dt)
             if safetyCar.speedMs < 0.1 then
                 writeLog("SC: Safety Car has stopped unexpectedly!")
                 if ac.tryToTeleportToPits() then
-                    if ac.tryToStart() then
-                        writeLog("SC: SC reset in pits successful")
-                    else
-                        writeLog("SC: SC reset in pits failed")
-                        waitingToStart = true
-                    end
+                    writeLog("SC: SC reset in pits successful")
+                else
+                    writeLog("SC: SC reset in pits failed")
                 end
 
                 scHeadingToPit = false
