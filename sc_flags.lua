@@ -502,12 +502,18 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 writeLog("SC: Recieved - Go Green")
                 -- Unused -> we track leader on client side for accuracy
             elseif message == "SC kill" then
-                initializeSCFlagScript()
+                --initializeSCFlagScript()
                 writeLog("SC: Recieved - SC kill")
+                --treat this like the SC has gone in
+                scIsClear()
             elseif message == "SC: Test On" then
                 scTestOn()
             elseif message == "SC: Test Off" then
                 scTestOff()
+            end
+
+            if message:startsWith("SC:") then
+                ac.sendChatMessage("SC ack")
             end
         end
     end
