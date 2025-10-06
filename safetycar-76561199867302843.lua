@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " Q| " .. message)
+    ac.log(timeStamp .. " A| " .. message)
 end
 
 --get the id of the SC
@@ -1015,19 +1015,25 @@ function script.update(dt)
         timeHalfSecAccumulator = timeAccumulator
     end
 
-    if scHeadingToPit and safetyCar.isInPit and safetyCar.isInPitlane and safetyCar.speedMs < 0.0001 then
-        writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
-        writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
-        writeLog("SC speed: " .. tostring(safetyCar.speedMs))
-        -- Reset SC once entering pit box
-        physics.setCarAutopilot(false, false)
-        if ac.tryToTeleportToPits() then
-            if ac.tryToStart() then
-                writeLog("SC: SC reset in pits successful")
-            else
-                writeLog("SC: SC reset in pits failed")
-                writeLog("RESET FAILED - setting waiting to start to true")
-                waitingToStart = true
+    
+    if scHeadingToPit then
+        if safetyCarID then
+            safetyCar = ac.getCar(safetyCarID)
+        end
+        if safetyCar.isInPit  then
+            writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
+            writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
+            writeLog("SC speed: " .. tostring(safetyCar.speedMs))
+            -- Reset SC once entering pit box
+            physics.setCarAutopilot(false, false)
+            if ac.tryToTeleportToPits() then
+                if ac.tryToStart() then
+                    writeLog("SC: SC reset in pits successful")
+                else
+                    writeLog("SC: SC reset in pits failed")
+                    writeLog("RESET FAILED - setting waiting to start to true")
+                    waitingToStart = true
+                end
             end
         end
 
