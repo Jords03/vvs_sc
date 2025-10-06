@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " A| " .. message)
 end
 
 --get the id of the SC
@@ -1023,6 +1023,8 @@ function script.update(dt)
                 writeLog("SC: SC reset in pits successful")
             else
                 writeLog("SC: SC reset in pits failed")
+                writeLog("RESET FAILED - setting waiting to start to true")
+                waitingToStart = true
             end
         end
 
