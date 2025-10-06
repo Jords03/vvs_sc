@@ -102,7 +102,7 @@ local scBorkedCheckTimer
 local scBorked
 local scBorkedStartTime
 
-local waitForAckTimer = -1
+local waitForSuccessfulSendTimer = -1
 local lastMessage = ""
 
 --spline positions for easy lookup
@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " D| " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 --get the id of the SC
@@ -445,21 +445,19 @@ local function tableContains(testTable, value)
     return false
   end
 
---send SC message and wait for ACK message
-local function sendMessageWithAck(message)
-    waitForAckTimer = timeAccumulator
-    lastMessage = message
-    ac.sendChatMessage(message)
+--send SC message and retry if fails
+local function sendMessageWithRetry(message)
+    if ac.sendChatMessage(message) then
+        waitForSuccessfulSendTimer = -1
+        lastMessage = ""
+    else
+        waitForSuccessfulSendTimer = timeAccumulator
+        lastMessage = message
+    end
 end
 
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
-    if message:startsWith("SC ack") then
-            writeLog("SC: ACK Received - " .. message)
-            waitForAckTimer = -1
-            lastMessage = ""
-    end
-
     if senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) then
         if message == "SC scon" then
             callSafetyCar()
@@ -481,10 +479,10 @@ local function processChatMessage(message, senderCarIndex)
             waitingToRollingStart = true
         elseif message == "SC teston" then
             writeLog("SC: Safety Car Test On")
-            sendMessageWithAck("SC: Test On")
+            sendMessageWithRetry("SC: Test On")
         elseif message == "SC testoff" then
             writeLog("SC: Safety Car Test Off")
-            sendMessageWithAck("SC: Test Off")
+            sendMessageWithRetry("SC: Test Off")
         end
     end
     return true
@@ -765,10 +763,10 @@ function script.update(dt)
     end
 
     --are we waiting for an ACK message?
-    if waitForAckTimer ~= -1 then
-        if timeAccumulator - waitForAckTimer > 4 then
-            writeLog("NO ACK RECEIVED, RESENDING MESSAGE")
-            sendMessageWithAck(lastMessage)
+    if waitForSuccessfulSendTimer ~= -1 then
+        if timeAccumulator - waitForSuccessfulSendTimer > 1 then
+            writeLog("MESSAGE SEND FAILED - TRYING AGAIN")
+            sendMessageWithRetry(lastMessage)
         end
     end
 
@@ -787,7 +785,7 @@ function script.update(dt)
             scHeadingToPit = false
             waitingToRollingStart = false
             checkClosestCarToSC = true
-            sendMessageWithAck("SC: Safety Car rolling start")
+            sendMessageWithRetry("SC: Safety Car rolling start")
             --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
         end
     end
@@ -816,7 +814,7 @@ function script.update(dt)
         -- Runs for a single frame when the SC leaves the pits
         if not scInPitLane and not scOnTrack then
             writeLog("SC: Safety Car deployed")
-            sendMessageWithAck("SC: Safety Car deployed")
+            sendMessageWithRetry("SC: Safety Car deployed")
             scOnTrack = true
             scInPitLane = false
             checkClosestCarToSC = true
@@ -827,7 +825,7 @@ function script.update(dt)
     end
 
     if scManualCallIn then
-        sendMessageWithAck("SC: Safety Car in this lap")
+        sendMessageWithRetry("SC: Safety Car in this lap")
         scManualCallIn = false
     end
 
@@ -860,7 +858,7 @@ function script.update(dt)
             scHeadingToPit = true
             scRequested = false
             setSCRequestPit()
-            sendMessageWithAck("SC: Safety Car is heading to pits at end of session")
+            sendMessageWithRetry("SC: Safety Car is heading to pits at end of session")
         end
 
         ac.debug("timeLongAccumulator", timeLongAccumulator)
@@ -963,7 +961,7 @@ function script.update(dt)
                     or safetyCar.lapCount - scPrevLapCount >= scMaxLapsOut
                     then
                         scConditonsMet = true
-                        sendMessageWithAck("SC: Safety Car in this lap")
+                        sendMessageWithRetry("SC: Safety Car in this lap")
                         writeLog("SC: Conditions met for Safety Car to come in")
                         writeLog("SC: Safety Car in this lap")
                         -- See med timer for call in/heading to pit 
@@ -992,14 +990,14 @@ function script.update(dt)
                 scInPitLane = true
                 scConditonsMet = false
                 rollingStart = false
-                sendMessageWithAck("SC: Safety Car is clear")
+                sendMessageWithRetry("SC: Safety Car is clear")
             end
 
 
 
             if safetyCar.isInPitlane then
                 scOnTrack = false
-                sendMessageWithAck("SC: Safety Car is clear")
+                sendMessageWithRetry("SC: Safety Car is clear")
                 writeLog("SC: Safety Car is clear")
                 setPitInSpeed()
                 checkLeaderPos = true
