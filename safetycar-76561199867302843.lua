@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " A| " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 --get the id of the SC
@@ -393,6 +393,7 @@ local function initializeSCScript()
         ac.tryToOpenRaceMenu(nil)
         ac.disableQuickMenuPitstop(true)
         --Forcing a slight delay to allow for teleport for rolling starts
+        writeLog("INIT - setting waitingToStart to true")
         waitingToStart = true
 
     else
@@ -732,6 +733,7 @@ function script.update(dt)
         if timeAccumulator - waitingToStartTimerOn >= 1 then
             if ac.tryToTeleportToPits() then
                 waitingToTeleport = false
+                writeLog("BACKUP TELEPORT - setting waitingToStart to true")
                 waitingToStart = true
                 writeLog("SC: Backup Teleportation to pit successful")
             end
@@ -744,6 +746,7 @@ function script.update(dt)
             ac.tryToOpenRaceMenu(nil)
             if ac.tryToStart() then
                 writeLog("SC: Backup teleportation to pit and start successful")
+                writeLog("BACKUP TELEPORT - setting waitingToStart to false")
                 waitingToStart = false
                 if rollingStart and sim.raceSessionType == 3 then
                     jumpSCtoStart()
@@ -1020,7 +1023,6 @@ function script.update(dt)
                 writeLog("SC: SC reset in pits successful")
             else
                 writeLog("SC: SC reset in pits failed")
-                waitingToStart = true
             end
         end
 
