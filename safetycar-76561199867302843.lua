@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " C| " .. message)
+    ac.log(timeStamp .. " D| " .. message)
 end
 
 --get the id of the SC
@@ -454,8 +454,8 @@ end
 
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
-    if message == "SC ack" then
-            writeLog("SC: ACK Received")
+    if message:startsWith("SC ack") then
+            writeLog("SC: ACK Received - " .. message)
             waitForAckTimer = -1
             lastMessage = ""
     end
