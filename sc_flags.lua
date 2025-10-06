@@ -506,6 +506,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 --initializeSCFlagScript()
                 writeLog("SC: Recieved - SC kill")
                 --treat this like the SC has gone in
+                scInThisLap()
                 scIsClear()
             elseif message == "SC kf" then 
                 writeLog("SC: Recieved - SC kf")
