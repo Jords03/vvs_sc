@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " A| " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 --get the id of the SC
@@ -1046,6 +1046,9 @@ function script.update(dt)
         scInPitLane = true
         scConditonsMet = false
         rollingStart = false
+
+        initializeSSStates()
+        initializeSCScript()
         --ac.sendChatMessage("SC: Safety Car has reset in pits")   
     end
 
