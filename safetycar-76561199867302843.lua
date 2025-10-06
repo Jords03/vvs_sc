@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " A| " .. message)
+    ac.log(timeStamp .. " | " .. message)
 end
 
 --get the id of the SC
@@ -1015,7 +1015,7 @@ function script.update(dt)
         timeHalfSecAccumulator = timeAccumulator
     end
 
-    if scHeadingToPit and safetyCar.isInPit then
+    if scHeadingToPit and safetyCar.isInPit and safetyCar.speedMs < 0.1 then
         -- Reset SC once entering pit box
         physics.setCarAutopilot(false, false)
         if ac.tryToTeleportToPits() then
