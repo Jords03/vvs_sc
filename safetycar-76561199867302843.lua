@@ -111,7 +111,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " |H " .. message)
 end
 
 --get the id of the SC
@@ -897,6 +897,10 @@ function script.update(dt)
     -- Things we do every 1 (short) seconds
     if timeAccumulator - timeShortAccumulator >= timeShort then
 
+        ac.debug("SC is in pit lane: ", safetyCar.isInPitlane)
+        ac.debug("SC is in pit: ", safetyCar.isInPit)
+        ac.debug("SC speed: ", safetyCar.speedMs)
+
         if scRequested and not scOnTrack and scBorked then
             --if 2 mins have passed then abort
             if timeAccumulator - scBorkedStartTime >= 120 then
@@ -1024,6 +1028,8 @@ function script.update(dt)
         end
 
         if safetyCar.isInPit  then
+
+            
 
             writeLog("SC is in pit lane: " .. tostring(safetyCar.isInPitlane))
             writeLog("SC is in pit: " .. tostring(safetyCar.isInPit))
