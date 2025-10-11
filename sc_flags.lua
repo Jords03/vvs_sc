@@ -1,4 +1,5 @@
-local debug
+local debug = false
+local version = "1.0.0"
 
 -- Get states
 local sim = ac.getSim()
@@ -237,7 +238,7 @@ end
 
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message) -- Also log to the default writeLog
+    ac.log(timeStamp .. " | " .. version .." | " .. message) -- Also log to the default writeLog
 end
 --[[ 
 local function setDebugConditions()
@@ -249,6 +250,7 @@ local function repositionFlags()
 end
 
 local function initializeSCFlagScript()
+    writeLog("SC Flags: Initialization starting")
     flagColor = rgbm.colors.gray
     showFlags = false
     goGreen = false
@@ -257,13 +259,13 @@ local function initializeSCFlagScript()
     debug = false
     getStates()
     reInitailizeVars()
-    writeLog("SC: Initialization finished - sending notification messages.")
+    writeLog("SC Flags: Initialization finished - sending notification messages.")
     if (driverCar ==nil) then
-        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation ERROR driverCar not identified!")
+        ac.sendChatMessage("SC: INFO | SC Flags Script " .. version .. " Initialisation ERROR driverCar not identified!")
     elseif (safetyCar == nil) then
-        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
+        ac.sendChatMessage("SC: INFO | SC Flags Script " .. version .. " Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
     else
-        ac.sendChatMessage("SC: INFO | SC Flags Script Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
+        ac.sendChatMessage("SC: INFO | SC Flags Script " .. version .. " Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
     end
 end
 
@@ -353,6 +355,7 @@ end
 web.loadRemoteAssets("https://raw.githubusercontent.com/Jords03/vvs_sc/main/sc_wav_files_001.zip", logAudioCallback)
 
 local function setRollingStartConditions()
+    writeLog("SC Flags: Set Rolling Start Conditions")
     flagColor = rgbm.colors.yellow
     scTextColor = rgbm.colors.black
     scHeadingTextColor = rgbm.colors.yellow
@@ -365,10 +368,11 @@ local function setRollingStartConditions()
     headingToPits = false
     scCleared = false
     goGreen = false
+    writeLog("SC Flags: Set Rolling Start Conditions Done")
 end
 
 local function scTestOn()
-    writeLog("SC: Recieved - Test On")
+    writeLog("SC Flags: Recieved - Test On")
     flagColor = rgbm.colors.yellow
     scTextColor = rgbm.colors.black
     scHeadingTextColor = rgbm.colors.yellow
@@ -384,16 +388,18 @@ local function scTestOn()
     scOnTrack = true
     audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
     audioSCDeployedEvent.volume = 5
-    audioSCDeployedEvent:start()    
+    audioSCDeployedEvent:start()
+    writeLog("SC Flags: Recieved - Test On Done")
 end
 
 local function scTestOff()
-    writeLog("SC: Recieved - Test Off")
+    writeLog("SC Flags: Recieved - Test Off")
     initializeSCFlagScript()
+    writeLog("SC Flags: Recieved - Test Off Done")
 end
 
 local function scDeployed()
-    writeLog("SC: Recieved - Safety Car deployed")
+    writeLog("SC Flags: Recieved - Safety Car deployed")
     flagColor = rgbm.colors.yellow
     scTextColor = rgbm.colors.black
     scHeadingTextColor = rgbm.colors.yellow
@@ -409,11 +415,12 @@ local function scDeployed()
     scOnTrack = true
     audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
     audioSCDeployedEvent.volume = 5
-    audioSCDeployedEvent:start()    
+    audioSCDeployedEvent:start()
+    writeLog("SC Flags: Recieved - Safety Car deployed Done")
 end
 
 local function scInThisLap()
-    writeLog("SC: Recieved - Safety Car in this lap")
+    writeLog("SC Flags: Recieved - Safety Car in this lap")
     flagColor = rgbm(0.6, 0.6, 0, 1)
     scStatusText = scState.returning
     scTextColor = rgbm.colors.black
@@ -431,10 +438,11 @@ local function scInThisLap()
     audioSCInThisLapEvent.volume = 5
     audioSCInThisLapEvent:start()
     timeToDisplayTextAccumulator = timeAccumulator
+    writeLog("SC Flags: Recieved - Safety Car in this lap Done")
 end
 
 local function scIsClear()
-    writeLog("SC: Recieved - Safety Car is clear")
+    writeLog("SC Flags: Recieved - Safety Car is clear")
     flagColor = rgbm(0.4, 0.4, 0.4, 1)
     scStatusText = scState.enteringPit
     scTextColor = rgbm.colors.yellow
@@ -449,6 +457,7 @@ local function scIsClear()
     audioSCClearEvent.volume = 5
     audioSCClearEvent:start()
     timeToDisplayTextAccumulator = timeAccumulator
+    writeLog("SC Flags: Recieved - Safety Car is clear Done")
 end
 
 local function setConditionsLateJoin()
@@ -483,10 +492,10 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             getStates()
         end
         if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
-            writeLog("SC: chatmsg: " .. message)
+            writeLog("SC Flags: chatmsg: " .. message)
 
             if message == "SC: Safety Car rolling start" then
-                writeLog("SC: Recieved - Safety Car rolling start")
+                writeLog("SC Flags: Recieved - Safety Car rolling start")
                 setRollingStartConditions()
             elseif message == "SC: Safety Car deployed" then
                 scDeployed()
@@ -495,21 +504,21 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
             elseif message == "SC: Safety Car is clear" then
                 scIsClear()
             elseif message == "SC: Safety Car has reset in pits" then
-                writeLog("SC: Recieved - Safety Car has reset in pits")
+                writeLog("SC Flags: Recieved - Safety Car has reset in pits")
                 --flagColor = rgbm.colors.gray
                 --showFlags = true
                 --UNUSED
             elseif string.startsWith(message, "SC: Go Green") then
-                writeLog("SC: Recieved - Go Green")
+                writeLog("SC Flags: Recieved - Go Green")
                 -- Unused -> we track leader on client side for accuracy
             elseif message == "SC kill" then
                 --initializeSCFlagScript()
-                writeLog("SC: Recieved - SC kill")
+                writeLog("SC Flags: Recieved - SC kill")
                 --treat this like the SC has gone in
                 scInThisLap()
                 scIsClear()
             elseif message == "SC kf" then 
-                writeLog("SC: Recieved - SC kf")
+                writeLog("SC Flags: Recieved - SC kf")
                 initializeSCFlagScript()
             elseif message == "SC: Test On" then
                 scTestOn()
@@ -523,7 +532,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
     if string.startsWith(message, "SC: INFO") then
         table.insert(rollingStartPenalties, message)
 
-        ac.log("SC: Info message: " .. message)
+        writeLog("SC Flags: Info message: " .. message)
     end
     return true
 end)
@@ -993,6 +1002,7 @@ function script.update(dt)
     if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
         -- Check if all states exist; if not, re-initialize them
         if not sim or not currentSession or not driverCar or not safetyCar or not adminCars then
+            writeLog("SC Flags: Lost state somehow so reinit")
             getStates()
         end
         checkStatesAccumulator = timeAccumulator
@@ -1058,7 +1068,7 @@ function script.update(dt)
                         if prevRaceLeaderCar == acReportedLeaderCar then
                             --it is so all good, we can trust it
                             raceLeaderCar = acReportedLeaderCar
-                            --writeLog("Race leader is: " .. raceLeaderCar:driverName())
+                            writeLog("SC Flags: Race leader change - leader now is: " .. raceLeaderCar:driverName())
                             leaderChangedLastBeat = false
                         else
                             --it changed again, we can't trust this
@@ -1149,6 +1159,7 @@ function script.update(dt)
         --######################
         -- Get lap counts when SC called in
         if getCarLapCounts then
+            writeLog("SC Flags: Getting car lap counts")
             for i, car in ac.iterateCars.leaderboard() do
                 -- Edge case - ignore straglers who might be behind Start Finish but ahead of SC when it clears
                 -- TODO: Not sure about this
@@ -1157,7 +1168,7 @@ function script.update(dt)
                 else
                     carLapCounts[car.index] = car.lapCount or 0
                 end
-                writeLog("SC: Car ID: " .. car.index .. " on lap " .. car.lapCount)
+                writeLog("SC Flags: Car ID: " .. car.index .. " on lap " .. car.lapCount)
             end
             --checkGoGreen = true
             getCarLapCounts = false
@@ -1167,7 +1178,7 @@ function script.update(dt)
         -- Go green same time
         if checkGoGreen then
             if raceLeaderCar ~=nil and raceLeaderCar.lapCount > carLapCounts[raceLeaderCar.index] then
-                writeLog("SC: Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
+                writeLog("SC Flags: Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
                 flagColor = rgbm(0,225,0,1)
                 scHeadingTextColor = rgbm(0,225,0,1)
                 scHeadingText = scHeadingTextState.green
@@ -1180,6 +1191,7 @@ function script.update(dt)
                 --How do we log this with online scripts?
                 --
                 if rollingStart then
+                    writeLog("SC Flags: Go green from rolling start")
                     -- Penalize speeding
                     --TODO: Add UI text element
                     local penalty = 0
@@ -1192,7 +1204,7 @@ function script.update(dt)
                     end
                     if penalty > 0 then
                         --ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
-                        writeLog("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
+                        writeLog("SC Flags: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
                     end
                 end
 
@@ -1207,6 +1219,8 @@ function script.update(dt)
                 conditionsMet = false
 
                 timeToDisplayGreenAccumulator = timeAccumulator
+
+                writeLog("SC Flags: About to send green light chat message back")
 
                 if driverCar ~= nil and raceLeaderCar ~= nil then
                     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
@@ -1236,13 +1250,13 @@ end)
 
 function script.reset()
     initializeSCFlagScript()
-    writeLog("SC: Flag Script Reset")
+    writeLog("SC Flags: Flag Script Reset")
 end
 
 --ac.onRelease(initializeSCFlagScript)
 ac.onRelease(function()
     initializeSCFlagScript()
-    writeLog("SC: Flag Script Released/Reload")
+    writeLog("SC Flags: Flag Script Released/Reload")
 end)
 
 initializeSCFlagScript()
