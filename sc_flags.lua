@@ -1,5 +1,5 @@
 local debug = false
-local version = "1.0.1"
+local version = "1.0.2"
 
 -- Get states
 local sim = ac.getSim()
@@ -134,8 +134,8 @@ else
 end
 
 -- Data storage for tracking the previous states of the text 
-local previousHelperTextState = nil
-local previousMinus1HelpertextState = nil
+local previousHelperTextState = ""
+local previousMinus1HelpertextState = ""
 local distanceThreshold = 16
 local distanceThresholdMultiplier = 2.5
 
@@ -221,8 +221,8 @@ local function reInitializeVars()
     end
 
     -- Data storage for tracking the previous state of the text
-    previousHelperTextState = nil
-    previousMinus1HelpertextState = nil
+    previousHelperTextState = ""
+    previousMinus1HelpertextState = ""
 
 end
 
@@ -674,7 +674,7 @@ local function checkPos(dt)
             scLeaderText = scLeaderTextState.goAnyTime
         else
             -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
-            if previousMinus1HelpertextState == nil then
+            if previousMinus1HelpertextState == "" then
                 --prev minus 1 is nil so this is the first beat that we changed, if this is one that we need to sanitise then just store it
                 if newHelperTextState == scHelperTextState.catchSC or newHelperTextState == scHelperTextState.closeGap or newHelperTextState == scHelperTextState.catchPack  then
                     previousMinus1HelpertextState = newHelperTextState
@@ -690,11 +690,11 @@ local function checkPos(dt)
                     --we do so set the values and continue
                     scHelperText = newHelperTextState
                     --writeLog("do care: " .. scHelperText)
-                    previousMinus1HelpertextState = nil
+                    previousMinus1HelpertextState = ""
                     previousHelperTextState = newHelperTextState
                 else
                     --sanity check failed, this is a different condition than last time - just reset the prev minus 1 check
-                    previousMinus1HelpertextState = nil
+                    previousMinus1HelpertextState = ""
                 end
             end
         end
