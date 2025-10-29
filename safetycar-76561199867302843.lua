@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.2"
-SCRIPT_VERSION_CODE = 00002
+SCRIPT_VERSION = "0.0.0.3"
+SCRIPT_VERSION_CODE = 00003
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -414,6 +414,11 @@ local function callSafetyCar()
     writeLog("SC: Safety Car is being called")
     if not ensureSimAndSafetyCar() then 
         writeLog("SC: Safety Car Broken!!")
+        return 
+    end
+
+    if scOnTrack then 
+        writeLog("SC: Cannot be called as already during callout")
         return 
     end
 
