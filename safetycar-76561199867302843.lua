@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.5"
-SCRIPT_VERSION_CODE = 00005
+SCRIPT_VERSION = "0.0.0.6"
+SCRIPT_VERSION_CODE = 00006
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -667,10 +667,11 @@ local function getLeadingCarBehindSC()
 
     local trustableValues = sharedData.carsArray
     local activeCars = sharedData.activeCarsCount
-
+    ac.debug("SC active cars:", activeCars)
     for pos=1,activeCars,1 do
         local car = ac.getCar(trustableValues[pos].carId)
         if car ~= nil then
+            ac.debug(car:driverName() .. " is retired ", trustableValues[pos].isRetired)
             if not (car.isInPit or car.isInPitlane or car == safetyCar or trustableValues[pos].isRetired) then
                 leadingCarNotInPit = car
                 ac.debug("SC: Leading Car Behind SC: ", car:driverName())
