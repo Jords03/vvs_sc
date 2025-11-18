@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.6"
-SCRIPT_VERSION_CODE = 00006
+SCRIPT_VERSION = "0.0.0.7"
+SCRIPT_VERSION_CODE = 00007
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -560,7 +560,7 @@ local function updateCarStatuses()
                         --if the table length is now over 10 then pop the last value, which is the gap from 5 seconds ago
                         --if we don't have 5 seconds worth of data so assume this car is active
                         local thisCarIsActive = true 
-                        if #previousGapTable >= 10 then
+                        if #previousGapTable >= 20 then
                             --get and pop the gap from 5s ago
                             local gapFrom5sAgo = table.remove(previousGapTable)
                             --if you aren't within the threshold distance of the SC and you have not gained time on the SC then mark the car as inactive
@@ -671,7 +671,6 @@ local function getLeadingCarBehindSC()
     for pos=1,activeCars,1 do
         local car = ac.getCar(trustableValues[pos].carId)
         if car ~= nil then
-            ac.debug(car:driverName() .. " is retired ", trustableValues[pos].isRetired)
             if not (car.isInPit or car.isInPitlane or car == safetyCar or trustableValues[pos].isRetired) then
                 leadingCarNotInPit = car
                 ac.debug("SC: Leading Car Behind SC: ", car:driverName())
