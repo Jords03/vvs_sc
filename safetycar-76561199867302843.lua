@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.4"
-SCRIPT_VERSION_CODE = 00004
+SCRIPT_VERSION = "0.0.0.5"
+SCRIPT_VERSION_CODE = 00005
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -110,7 +110,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " | " .. SCRIPT_VERSION .. " | " .. message)
 end
 
 --get the id of the SC
@@ -680,13 +680,16 @@ local function getLeadingCarBehindSC()
     end
 
     if leadingCarNotInPit then
+        ac.debug("SC no lead car:", false)
         local scSplinePos = trustableSplinePostionsById[safetyCar.index]
         local carSplinePos = trustableSplinePostionsById[leadingCarNotInPit.index]
         local distance = calculateDistanceToSC(carSplinePos, scSplinePos)
 
         distanceMeters = distance * trackLength
-        --ac.debug("SC: LC distance to SC:", distanceMeters)
-        --ac.debug("SC: scSplinePos:", scSplinePos)
+        ac.debug("SC: LC distance to SC:", distanceMeters)
+        ac.debug("SC: scSplinePos:", scSplinePos)
+    else
+        ac.debug("SC no lead car:", true)
     end
 
     return leadingCarNotInPit, distanceMeters
@@ -960,6 +963,7 @@ function script.update(dt)
             resetBrakeInPitHackSuccess = false
         end
         -- Get the leader behind the SC not in pit and set SC speed up
+        ac.debug("SC: check closest: ", checkClosestCarToSC)
         if checkClosestCarToSC then
             local lc, lcDistance = getLeadingCarBehindSC()
             if lc then
