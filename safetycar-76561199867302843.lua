@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.7"
-SCRIPT_VERSION_CODE = 00007
+SCRIPT_VERSION = "0.0.0.8"
+SCRIPT_VERSION_CODE = 00008
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -167,10 +167,9 @@ local function initializeSSStates()
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 28 -- multiplier for distance behind SC N x carSpacing
     activeCarCount = 0
-    provisionalActiveCarCount = 0
     activeCarArray = {}
-    previousGapToSC = {}
-    gainingTimeThreshold = 2
+    --previousGapToSC = {}
+    --gainingTimeThreshold = 2
 
     -- Time accumulators
     timeHalfSec = 0.5 -- seconds
@@ -539,8 +538,11 @@ local function updateCarStatuses()
                     if sharedData.carsArray[car.index].isRetired then
                         writeLog("SC: " .. car:driverName() .. " is retired")
                     else
-                        --is gaining check
-
+                        activeCarArray[activeCarCount] = car
+                        activeCarCount = activeCarCount + 1
+                        writeLog("SC: " .. car:driverName() .. " is active")
+                        --is gaining check - disabled
+--[[
                         --get current gap to SC
                         local carSplinePos = trustableSplinePostionsById[car.index]
                         local distanceToSC = calculateDistanceToSC(carSplinePos, scSplinePos)
@@ -585,6 +587,7 @@ local function updateCarStatuses()
 
                         --not sure if the table is immutable, but just in case then reset the value
                         previousGapToSC[car.index] = previousGapTable
+                        ]]--
 
                     end
                 end
@@ -844,18 +847,18 @@ function script.update(dt)
             writeLog("SC: Safety Car deployed")
             sendMessageWithRetry("SC: Safety Car deployed")
             --reinit the gaps arrays
-            previousGapToSC = {}
+            --previousGapToSC = {}
             --get the provisional active cars count - this is just the count of unretired cars
-            provisionalActiveCarCount = 0
-            for i, car in ac.iterateCars.ordered() do
+            --provisionalActiveCarCount = 0
+            --for i, car in ac.iterateCars.ordered() do
                 --ignore SC
-                if car ~= safetyCar then
-                    if not sharedData.carsArray[car.index].isRetired then
-                        provisionalActiveCarCount = provisionalActiveCarCount + 1
-                    end
-                end
-            end
-            writeLog("SC: Provisional active car count is " .. provisionalActiveCarCount)
+                --if car ~= safetyCar then
+                    --if not sharedData.carsArray[car.index].isRetired then
+                        --provisionalActiveCarCount = provisionalActiveCarCount + 1
+                    --end
+                --end
+            --end
+            --writeLog("SC: Provisional active car count is " .. provisionalActiveCarCount)
 
             scOnTrack = true
             scInPitLane = false
