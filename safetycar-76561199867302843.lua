@@ -45,15 +45,8 @@ local safetyCarPitInSpeed
 local scLeadDistThresholdMin
 local distanceThresholdMeters
 local carSpacing
-local inPitTimeLimit
 local activeCarCount
-local provisionalActiveCarCount
 local activeCarArray
-local retiredCars
-local previousGapToSC
-local gainingTimeThreshold
-local minConnectedCars
-local normTrackCenter
 
 -- Time accumulators
 local timeHalfSec
@@ -92,8 +85,8 @@ local scManualCallIn
 local checkLeaderPos
 local underSCLapCount
 local scPrevLapCount
+local scLapCountWhenCalledIn
 local scMaxLapsOut
-local raceLeader
 local resetBrakeInPitHack
 local resetBrakeInPitHackSuccess
 
@@ -210,8 +203,8 @@ local function initializeSSStates()
     checkLeaderPos = false
     underSCLapCount = 0
     scPrevLapCount = 0
+    scLapCountWhenCalledIn = 0
     scMaxLapsOut = 2
-    raceLeader = nil
     resetBrakeInPitHack = false
     resetBrakeInPitHackSuccess = false
 
@@ -317,7 +310,6 @@ local function jumpSCtoStart()
     local rightDistance = scTrackSides.y
     local trackCenter = (leftDistance + rightDistance) / 2
     local normalizedTrackCenter = normalize_position(trackCenter, leftDistance, rightDistance)
-    normTrackCenter = normalizedTrackCenter
 
     -- Calculate world coordinates
     local scTrackProgressWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, scTrackPos))
@@ -515,7 +507,7 @@ local function updateCarStatuses()
 
     --track and build an array of active cars - to be active you must be going at over 10KMH
     --not be in the pits or the pit lane, and not be retired, and not be the SC 
-    --and in the last 5 seconds you must have gained some time on the SC
+    --DISABLED and in the last 5 seconds you must have gained some time on the SC DISABLED!!!
     --Note this is called every 0.5 secs so we maintain a LIFO list and do the threshold check on the 10th item
 
     --array to build of active cars and array counter
@@ -540,9 +532,10 @@ local function updateCarStatuses()
                     else
                         activeCarArray[activeCarCount] = car
                         activeCarCount = activeCarCount + 1
-                        writeLog("SC: " .. car:driverName() .. " is active")
+                        --writeLog("SC: " .. car:driverName() .. " is active")
+
                         --is gaining check - disabled
---[[
+                        --[[
                         --get current gap to SC
                         local carSplinePos = trustableSplinePostionsById[car.index]
                         local distanceToSC = calculateDistanceToSC(carSplinePos, scSplinePos)
@@ -587,7 +580,7 @@ local function updateCarStatuses()
 
                         --not sure if the table is immutable, but just in case then reset the value
                         previousGapToSC[car.index] = previousGapTable
-                        ]]--
+                        ]]
 
                     end
                 end
@@ -817,7 +810,6 @@ function script.update(dt)
             waitingToRollingStart = false
             checkClosestCarToSC = true
             sendMessageWithRetry("SC: Safety Car rolling start")
-            --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
         end
     end
 
@@ -846,19 +838,21 @@ function script.update(dt)
         if not scInPitLane and not scOnTrack then
             writeLog("SC: Safety Car deployed")
             sendMessageWithRetry("SC: Safety Car deployed")
-            --reinit the gaps arrays
-            --previousGapToSC = {}
+            --reinit the gaps arrays - not needed as was for the gaining check that's been disabled
+            --[[
+            previousGapToSC = {}
             --get the provisional active cars count - this is just the count of unretired cars
-            --provisionalActiveCarCount = 0
-            --for i, car in ac.iterateCars.ordered() do
+            provisionalActiveCarCount = 0
+            for i, car in ac.iterateCars.ordered() do
                 --ignore SC
-                --if car ~= safetyCar then
-                    --if not sharedData.carsArray[car.index].isRetired then
-                        --provisionalActiveCarCount = provisionalActiveCarCount + 1
-                    --end
-                --end
-            --end
+                if car ~= safetyCar then
+                    if not sharedData.carsArray[car.index].isRetired then
+                        provisionalActiveCarCount = provisionalActiveCarCount + 1
+                    end
+                end
+            end
             --writeLog("SC: Provisional active car count is " .. provisionalActiveCarCount)
+            ]]
 
             scOnTrack = true
             scInPitLane = false
@@ -1014,6 +1008,7 @@ function script.update(dt)
                             sendMessageWithRetry("SC: Safety Car in this lap")
                             writeLog("SC: Conditions met for Safety Car to come in")
                             writeLog("SC: Safety Car in this lap")
+                            scLapCountWhenCalledIn = safetyCar.lapCount
                             -- See med timer for call in/heading to pit 
                         end
                     else
@@ -1044,7 +1039,24 @@ function script.update(dt)
                 sendMessageWithRetry("SC: Safety Car is clear")
             end
 
+            --SC lap count has increased but SC had been called in - it must have bypassed pitting - force clear it
+            if scLapCountWhenCalledIn < safetyCar.lapCount then
+                writeLog("SC: Safety Car has not pitted when it should have!")
+                writeLog("SC STOP - teleporting attempt")
+                if ac.tryToTeleportToPits() then
+                    writeLog("SC: SC reset in pits successful")
+                else
+                    writeLog("SC: SC reset in pits failed")
+                end
 
+                scHeadingToPit = false
+                scRequested = false
+                scOnTrack = false
+                scInPitLane = true
+                scConditonsMet = false
+                rollingStart = false
+                sendMessageWithRetry("SC: Safety Car is clear")
+            end
 
             if safetyCar.isInPitlane then
                 scOnTrack = false
