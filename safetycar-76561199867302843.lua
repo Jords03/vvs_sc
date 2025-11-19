@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.8"
-SCRIPT_VERSION_CODE = 00008
+SCRIPT_VERSION = "0.0.0.9"
+SCRIPT_VERSION_CODE = 00009
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -527,7 +527,7 @@ local function updateCarStatuses()
                     writeLog("SC: " .. car:driverName() .. " is in pitlane")
                 else
                     --retired check
-                    if sharedData.carsArray[car.index].isRetired then
+                    if car.isRetired then
                         writeLog("SC: " .. car:driverName() .. " is retired")
                     else
                         activeCarArray[activeCarCount] = car
