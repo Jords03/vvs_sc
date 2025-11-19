@@ -1013,8 +1013,6 @@ function script.update(dt)
                         end
                     else
                         ac.debug("SC: Safety Car within threshold", false)
-                        --reset previous gap data
-                        previousGapToSC = {}
                     end
                 end
             end        
