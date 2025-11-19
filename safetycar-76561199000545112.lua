@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.3"
-SCRIPT_VERSION_CODE = 00003
+SCRIPT_VERSION = "0.0.0.10"
+SCRIPT_VERSION_CODE = 00010
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -45,16 +45,8 @@ local safetyCarPitInSpeed
 local scLeadDistThresholdMin
 local distanceThresholdMeters
 local carSpacing
-local inPitTimeLimit
-local carsInPit
 local activeCarCount
 local activeCarArray
-local retiredCars
-local previousGapToSC
-local carsNotGainingOnSC
-local gainingTimeThreshold
-local minConnectedCars
-local normTrackCenter
 
 -- Time accumulators
 local timeHalfSec
@@ -93,8 +85,8 @@ local scManualCallIn
 local checkLeaderPos
 local underSCLapCount
 local scPrevLapCount
+local scLapCountWhenCalledIn
 local scMaxLapsOut
-local raceLeader
 local resetBrakeInPitHack
 local resetBrakeInPitHackSuccess
 
@@ -111,7 +103,7 @@ local trustableSplinePostionsById = {}
 --utility function to write log messages
 local function writeLog(message)
     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. message)
+    ac.log(timeStamp .. " | " .. SCRIPT_VERSION .. " | " .. message)
 end
 
 --get the id of the SC
@@ -167,12 +159,10 @@ local function initializeSSStates()
     scLeadDistThresholdMin = 120 -- update to adjust to speed of leader
     distanceThresholdMeters = 500 -- replaced by N/connected cars calc
     carSpacing = 28 -- multiplier for distance behind SC N x carSpacing
-    carsInPit = 0
     activeCarCount = 0
     activeCarArray = {}
-    previousGapToSC = {}
-    carsNotGainingOnSC = 0
-    gainingTimeThreshold = 2
+    --previousGapToSC = {}
+    --gainingTimeThreshold = 2
 
     -- Time accumulators
     timeHalfSec = 0.5 -- seconds
@@ -213,8 +203,8 @@ local function initializeSSStates()
     checkLeaderPos = false
     underSCLapCount = 0
     scPrevLapCount = 0
+    scLapCountWhenCalledIn = 0
     scMaxLapsOut = 2
-    raceLeader = nil
     resetBrakeInPitHack = false
     resetBrakeInPitHackSuccess = false
 
@@ -320,7 +310,6 @@ local function jumpSCtoStart()
     local rightDistance = scTrackSides.y
     local trackCenter = (leftDistance + rightDistance) / 2
     local normalizedTrackCenter = normalize_position(trackCenter, leftDistance, rightDistance)
-    normTrackCenter = normalizedTrackCenter
 
     -- Calculate world coordinates
     local scTrackProgressWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, scTrackPos))
@@ -511,95 +500,117 @@ local function calculateDistanceToSC(carPosition, car2Position)
     return car2Position - carPosition  -- Always a value between 0 and 1
 end
 
-
-
 -- Update car statuses and gaps to SC
 local function updateCarStatuses()
+    writeLog("SC: Update Car Statuses")
     local scSplinePos = trustableSplinePostionsById[safetyCar.index]
 
-    ac.debug("SC: activeCarCount", activeCarCount)
+    --track and build an array of active cars - to be active you must be going at over 10KMH
+    --not be in the pits or the pit lane, and not be retired, and not be the SC 
+    --DISABLED and in the last 5 seconds you must have gained some time on the SC DISABLED!!!
+    --Note this is called every 0.5 secs so we maintain a LIFO list and do the threshold check on the 10th item
+
+    --array to build of active cars and array counter
     activeCarCount = 0
-    carsInPit = 0
-    carsNotGainingOnSC = 0
     activeCarArray = {}
 
+    --step through all cars
     for i, car in ac.iterateCars.ordered() do
+        --ignore SC
         if car ~= safetyCar then
-            -- Update pit times or retirement status
-            if car.speedKmh > 10 then
-                if car.isInPitlane then
-                    --writeLog("SC: " .. car:driverName() .. " is in pitlane")
-                    carsInPit = carsInPit + 1
+            --10KMH check
+            if car.speedKmh <= 10 then
+                writeLog("SC: " .. car:driverName() .. " is too slow to be counted (under 10KMH)")
+            else
+                --pitlane check
+                if car.isInPitlane or car.isInPit then
+                    writeLog("SC: " .. car:driverName() .. " is in pitlane")
                 else
-                    --writeLog("SC: " .. car:driverName() .. " is on track")
-                    activeCarArray[activeCarCount] = car
-                    activeCarCount = activeCarCount + 1
+                    --retired check
+                    if car.isRetired then
+                        writeLog("SC: " .. car:driverName() .. " is retired")
+                    else
+                        activeCarArray[activeCarCount] = car
+                        activeCarCount = activeCarCount + 1
+                        --writeLog("SC: " .. car:driverName() .. " is active")
 
-                    -- Update car's gaps to SC
-                    local carSplinePos = trustableSplinePostionsById[car.index]
-                    local distanceToSC = calculateDistanceToSC(carSplinePos, scSplinePos)
-                    local secondsAhead = distanceToSC * trackLength / math.max(safetyCar.speedMs, 0.1)
-                    local previousSecondsAhead = previousGapToSC[car.index] or secondsAhead
-                    local isGaining = secondsAhead < previousSecondsAhead or secondsAhead < 15
+                        --is gaining check - disabled
+                        --[[
+                        --get current gap to SC
+                        local carSplinePos = trustableSplinePostionsById[car.index]
+                        local distanceToSC = calculateDistanceToSC(carSplinePos, scSplinePos)
+                        local secondsAhead = distanceToSC * trackLength / math.max(safetyCar.speedMs, 0.1)
 
-                    previousGapToSC[car.index] = secondsAhead
-                    --TODO: this doesn't seem right in terms of secs ahead
-                    writeLog("SC: " .. car:driverName() .. " | SecAhead: " .. math.floor(secondsAhead) .. " | isGaining: " .. tostring(isGaining))
+                        --init gap array if not already inited
+                        if previousGapToSC[car.index] == nil then
+                            previousGapToSC[car.index] = {}
+                        end
 
-                    if not isGaining and ((secondsAhead - previousSecondsAhead) > gainingTimeThreshold) then
-                        carsNotGainingOnSC = carsNotGainingOnSC + 1
+                        --get the previous gap table
+                        local previousGapTable = previousGapToSC[car.index]
+
+                        --push the current gap onto the table
+                        table.insert(previousGapTable, 1, secondsAhead)
+
+                        --if the table length is now over 10 then pop the last value, which is the gap from 5 seconds ago
+                        --if we don't have 5 seconds worth of data so assume this car is active
+                        local thisCarIsActive = true 
+                        if #previousGapTable >= 20 then
+                            --get and pop the gap from 5s ago
+                            local gapFrom5sAgo = table.remove(previousGapTable)
+                            --if you aren't within the threshold distance of the SC and you have not gained time on the SC then mark the car as inactive
+                            --distance is calculated based on the provisional active car count (unretired cars when SC was called out) as we don't
+                            --know the true count yet
+                            distanceThresholdMeters = (provisionalActiveCarCount + 3) * carSpacing
+                            local distanceMeters = distanceToSC * trackLength
+                            if distanceMeters > distanceThresholdMeters then
+                                if secondsAhead >= gapFrom5sAgo then
+                                    writeLog("SC: " .. car:driverName() .. " has not gained time in last 5 secs")
+                                    thisCarIsActive = false
+                                end
+                            end
+                        end
+                        
+                        --if this car is active then add it to the active car array
+                        if thisCarIsActive then
+                            activeCarArray[activeCarCount] = car
+                            activeCarCount = activeCarCount + 1
+                            writeLog("SC: " .. car:driverName() .. " is active")
+                        end
+
+                        --not sure if the table is immutable, but just in case then reset the value
+                        previousGapToSC[car.index] = previousGapTable
+                        ]]
+
                     end
-                end
-            elseif car.isInPit or car.isInPitlane then
-                if not sharedData.carsArray[car.index].isRetired then             
-                    writeLog("SC: " .. car:driverName() .. " is retired")
-                    carsInPit = carsInPit + 1
                 end
             end
         end
     end
-    writeLog("SC: Cars in pit: " .. carsInPit)
     writeLog("SC: Active cars: " .. activeCarCount)
-    writeLog("SC: Cars not gaining on SC: " .. carsNotGainingOnSC)
 end
 
 -- Check if the Safety Car can come in based on the number of cars and their positions
 local function canSafetyCarComeIn()
 
+    --update the active car array
     updateCarStatuses()
 
-    --local connectedCars = sim.connectedCars
-    --local carsNotGainingCount = carsNotGainingOnSC and #carsNotGainingOnSC or 0
-    --local N = connectedCars - retiredCarsCount - carsNotGainingCount - 1
-
-    local N = activeCarCount - carsInPit - carsNotGainingOnSC
-    local carsNearAndBehindSC = 0
-
-    distanceThresholdMeters = (N + 3) * carSpacing
-
-    ac.debug("SC: COMEIN? N (Cars) ", N)
-    ac.debug("SC: COMEIN? Active Cars", activeCarCount)
-    ac.debug("SC: COMEIN? Distance Threshold", distanceThresholdMeters)
-    ac.debug("SC: COMEIN? Cars in Pit", carsInPit)
-    ac.debug("SC: COMEIN? Cars Not Gaining", carsNotGainingOnSC)
-
+    --check if all active cars are within threshold - SC can only come in if ALL active cars are within the threshold
+    distanceThresholdMeters = (activeCarCount + 3) * carSpacing
+    --step across the acrive cars array and do the checks
     for pos=0,activeCarCount-1,1 do
         car = activeCarArray[pos]
-        if carsNearAndBehindSC >= N then
-            break
-        end
         local distanceToSC = calculateDistanceToSC(trustableSplinePostionsById[car.index], trustableSplinePostionsById[safetyCar.index])
         local distanceMeters = distanceToSC * trackLength
-        if car and distanceMeters < distanceThresholdMeters then
-            carsNearAndBehindSC = carsNearAndBehindSC + 1
+        if distanceMeters > distanceThresholdMeters then
+            writeLog("SC: " .. car:driverName() .. " is too far behind, SC cannot come in")
+            return false
         end
     end
-    --writeLog("SC: carsNearAndBehindSC = " .. carsNearAndBehindSC)
-    ac.debug("SC: COMEIN? CarsNearAndBehindSC", carsNearAndBehindSC)
-    local result = carsNearAndBehindSC >= N
-    ac.debug("SC: COMEIN? SC can come in", result)
-    --writeLog(result and "SC: Safety Car can come in this lap." or "SC: Not all cars are within threshold the Safety Car.")
-    return result
+
+    writeLog("SC: All cars are within threshold, SC can come in")
+    return true
 end
 
 -- For deciding if race is near complete
@@ -652,7 +663,7 @@ local function getLeadingCarBehindSC()
 
     local trustableValues = sharedData.carsArray
     local activeCars = sharedData.activeCarsCount
-
+    ac.debug("SC active cars:", activeCars)
     for pos=1,activeCars,1 do
         local car = ac.getCar(trustableValues[pos].carId)
         if car ~= nil then
@@ -665,13 +676,16 @@ local function getLeadingCarBehindSC()
     end
 
     if leadingCarNotInPit then
+        ac.debug("SC no lead car:", false)
         local scSplinePos = trustableSplinePostionsById[safetyCar.index]
         local carSplinePos = trustableSplinePostionsById[leadingCarNotInPit.index]
         local distance = calculateDistanceToSC(carSplinePos, scSplinePos)
 
         distanceMeters = distance * trackLength
-        --ac.debug("SC: LC distance to SC:", distanceMeters)
-        --ac.debug("SC: scSplinePos:", scSplinePos)
+        ac.debug("SC: LC distance to SC:", distanceMeters)
+        ac.debug("SC: scSplinePos:", scSplinePos)
+    else
+        ac.debug("SC no lead car:", true)
     end
 
     return leadingCarNotInPit, distanceMeters
@@ -796,7 +810,6 @@ function script.update(dt)
             waitingToRollingStart = false
             checkClosestCarToSC = true
             sendMessageWithRetry("SC: Safety Car rolling start")
-            --physics.setAISplineOffset(safetyCar.index, normTrackCenter, true)
         end
     end
 
@@ -825,6 +838,22 @@ function script.update(dt)
         if not scInPitLane and not scOnTrack then
             writeLog("SC: Safety Car deployed")
             sendMessageWithRetry("SC: Safety Car deployed")
+            --reinit the gaps arrays - not needed as was for the gaining check that's been disabled
+            --[[
+            previousGapToSC = {}
+            --get the provisional active cars count - this is just the count of unretired cars
+            provisionalActiveCarCount = 0
+            for i, car in ac.iterateCars.ordered() do
+                --ignore SC
+                if car ~= safetyCar then
+                    if not sharedData.carsArray[car.index].isRetired then
+                        provisionalActiveCarCount = provisionalActiveCarCount + 1
+                    end
+                end
+            end
+            --writeLog("SC: Provisional active car count is " .. provisionalActiveCarCount)
+            ]]
+
             scOnTrack = true
             scInPitLane = false
             checkClosestCarToSC = true
@@ -874,12 +903,11 @@ function script.update(dt)
         ac.debug("timeLongAccumulator", timeLongAccumulator)
         timeLongAccumulator = timeAccumulator
     end
-
+   
     -- Things we do every 5 (medium) seconds
     if timeAccumulator - timeMediumAccumulator >= timeMedium then
         -- Checks for retired cars and stragglers
         if scOnTrack and sim.timeToSessionStart < 0 then
-            updateCarStatuses()
             -- SC conditions met, wait +- 5 seconds before heading to pits
             if scConditonsMet and not scHeadingToPit then
                 scHeadingToPit = true
@@ -932,6 +960,7 @@ function script.update(dt)
             resetBrakeInPitHackSuccess = false
         end
         -- Get the leader behind the SC not in pit and set SC speed up
+        ac.debug("SC: check closest: ", checkClosestCarToSC)
         if checkClosestCarToSC then
             local lc, lcDistance = getLeadingCarBehindSC()
             if lc then
@@ -979,6 +1008,7 @@ function script.update(dt)
                             sendMessageWithRetry("SC: Safety Car in this lap")
                             writeLog("SC: Conditions met for Safety Car to come in")
                             writeLog("SC: Safety Car in this lap")
+                            scLapCountWhenCalledIn = safetyCar.lapCount
                             -- See med timer for call in/heading to pit 
                         end
                     else
@@ -1004,10 +1034,31 @@ function script.update(dt)
                 scInPitLane = true
                 scConditonsMet = false
                 rollingStart = false
+                setSCLights("off")
+                physics.setCarAutopilot(false, false)
                 sendMessageWithRetry("SC: Safety Car is clear")
             end
 
+            --SC lap count has increased but SC had been called in - it must have bypassed pitting - force clear it
+            if scLapCountWhenCalledIn < safetyCar.lapCount then
+                writeLog("SC: Safety Car has not pitted when it should have!")
+                writeLog("SC STOP - teleporting attempt")
+                if ac.tryToTeleportToPits() then
+                    writeLog("SC: SC reset in pits successful")
+                else
+                    writeLog("SC: SC reset in pits failed")
+                end
 
+                scHeadingToPit = false
+                scRequested = false
+                scOnTrack = false
+                scInPitLane = true
+                scConditonsMet = false
+                rollingStart = false
+                setSCLights("off")
+                physics.setCarAutopilot(false, false)
+                sendMessageWithRetry("SC: Safety Car is clear")
+            end
 
             if safetyCar.isInPitlane then
                 scOnTrack = false
