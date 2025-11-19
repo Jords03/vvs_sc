@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.9"
-SCRIPT_VERSION_CODE = 00009
+SCRIPT_VERSION = "0.0.0.10"
+SCRIPT_VERSION_CODE = 00010
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -1034,6 +1034,8 @@ function script.update(dt)
                 scInPitLane = true
                 scConditonsMet = false
                 rollingStart = false
+                setSCLights("off")
+                physics.setCarAutopilot(false, false)
                 sendMessageWithRetry("SC: Safety Car is clear")
             end
 
@@ -1053,6 +1055,8 @@ function script.update(dt)
                 scInPitLane = true
                 scConditonsMet = false
                 rollingStart = false
+                setSCLights("off")
+                physics.setCarAutopilot(false, false)
                 sendMessageWithRetry("SC: Safety Car is clear")
             end
 
