@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.10"
-SCRIPT_VERSION_CODE = 00010
+SCRIPT_VERSION = "0.0.0.11"
+SCRIPT_VERSION_CODE = 00011
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -393,8 +393,8 @@ local function initializeSCScript()
 
     -- Set track length dependent thresholds
     if trackLength >= 3500 then
-        SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
-        SC_CALLIN_THRESHOLD_END = 1 - (750 / trackLength)
+        SC_CALLIN_THRESHOLD_START = 1 - (2250 / trackLength)
+        SC_CALLIN_THRESHOLD_END = 1 - (1250 / trackLength)
     end
 end
 
