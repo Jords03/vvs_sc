@@ -1,8 +1,8 @@
 
 SCRIPT_NAME = "VVS Safety Car"
 SCRIPT_SHORT_NAME = "VVSSC"
-SCRIPT_VERSION = "0.0.0.11"
-SCRIPT_VERSION_CODE = 00011
+SCRIPT_VERSION = "0.0.0.12"
+SCRIPT_VERSION_CODE = 00012
 
 -- Edit this on per event basis?
 local startBehindSC = false
@@ -393,8 +393,9 @@ local function initializeSCScript()
 
     -- Set track length dependent thresholds
     if trackLength >= 3500 then
-        SC_CALLIN_THRESHOLD_START = 1 - (2250 / trackLength)
-        SC_CALLIN_THRESHOLD_END = 1 - (1250 / trackLength)
+        SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
+        SC_CALLIN_THRESHOLD_END = 1 - (750 / trackLength)
+        writeLog("SC: Longer track (" .. trackLength .. "), thresholds set to - start: " .. SC_CALLIN_THRESHOLD_START " | end: " .. SC_CALLIN_THRESHOLD_END)
     end
 end
 
@@ -992,10 +993,12 @@ function script.update(dt)
             writeLog("SC: SC scon received from shared data")
         end
 
+        local scSplinePos = trustableSplinePostionsById[safetyCar.index]
+        writeLog("SC: DEBUG-IN-CHECK scHeadingtoPit: " .. tostring(scHeadingToPit) .. " | scOnTrack: " .. tostring(scOnTrack) .. " | scConditionsMet " .. tostring(scConditonsMet) .. " | scrollingStart " .. tostring(rollingStart) .. " | scSplinePos " .. tostring(scSplinePos) )
+
         refreshSplineList()
         if not scHeadingToPit then
-            if scOnTrack and not scConditonsMet then
-                local scSplinePos = trustableSplinePostionsById[safetyCar.index]
+            if scOnTrack and not scConditonsMet then  
                 -- TODO: Ask Nigel to if we can get PitLane Spline?
                 if scSplinePos ~= nil then
                     if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
