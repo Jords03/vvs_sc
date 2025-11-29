@@ -301,22 +301,21 @@ function script.update(dt)
         scState = "rolling"
         setSCValues(scRollingState)
 
-        --test
-        waitTimer = timeAccumulator
-
         return
     end
 
     --test harness - 10 secs after start call it in
     if scState == "rolling" then
-        if timeAccumulator-waitTimer < 10 then
+        local scSplinePos = safetyCar.splinePosition
+        if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
+            writeLog("SC State Transitioning from " .. scState .. " to rollingComingIn")
+            scState = "rollingComingIn"
+            setSCValues(scRollingComingInState)
+            sendMessageWithRetry("SC: Safety Car in this lap")
+            return
+        else
             return
         end
-        writeLog("SC State Transitioning from " .. scState .. " to rollingComingIn")
-        scState = "rollingComingIn"
-        setSCValues(scRollingComingInState)
-        sendMessageWithRetry("SC: Safety Car in this lap")
-        return
     end
 
     --if SC coming in then wait until it enters the pit lane and send the clear message
