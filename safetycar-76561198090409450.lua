@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.01"
+SCRIPT_VERSION = "0.0.1.012"
 SCRIPT_VERSION_CODE = 00001
 
 --local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -45,7 +45,7 @@ end
 local scState = "inactive"
 local safetyCar
 local adminCars={}
-
+local scLapCountWhenCalledIn = -1
 
 --message send retry stuff
 local waitForSuccessfulSendTimer = -1
@@ -159,7 +159,7 @@ local scRollingState = {
 local scRollingComingInState = {
     autopilotOn = true,
     scTopSpeed = 180,
-    pitStopRequest = true,
+    pitStopRequest = false,
     lightsOn = true,
     throttleLimit = 0.5,
     aggression = 0.8
@@ -306,6 +306,8 @@ function script.update(dt)
             scState = "rollingComingIn"
             setSCValues(scRollingComingInState)
             sendMessageWithRetry("SC: Safety Car in this lap")
+            scLapCountWhenCalledIn = safetyCar.lapCount
+            writeLog("SC Lap count at call in is: " .. tostring(scLapCountWhenCalledIn))
             return
         else
             return
@@ -314,6 +316,24 @@ function script.update(dt)
 
     --if SC coming in then wait until it enters the pit lane and send the clear message
     if scState == "rollingComingIn" then
+
+        if scLapCountWhenCalledIn < safetyCar.lapCount then
+                writeLog("Safety Car has not pitted when it should have!")
+                writeLog("SC Missed pit lane - teleporting attempt")
+                if ac.tryToTeleportToPits() then
+                    writeLog("SC reset in pits successful")
+                    writeLog("SC State Transitioning from " .. scState .. " to inactive")
+                    scState = "inactiveX"
+                    setSCValues(scInactiveState)
+                    sendMessageWithRetry("SC: Safety Car is clear")
+                    return
+                else
+                    writeLog("SC reset in pits failed")
+                    return
+                end
+            end
+        end
+
         if safetyCar.isInPitlane then 
             writeLog("SC State Transitioning from " .. scState .. " to rollingInPitLane")
             scState = "rollingInPitLane"
@@ -329,7 +349,7 @@ function script.update(dt)
     if scState == "rollingInPitLane" then
 
         --sanity check, is SC speed has dropped to zero then deal with it
-         if safetyCar.speedMs < 0.0001 and not safetyCar.isInPit then
+         if safetyCar.speedMs < 0.1 and not safetyCar.isInPit then
             writeLog("Safety Car has stopped unexpectedly!")
             writeLog("SC STOP - teleporting attempt")
             if ac.tryToTeleportToPits() then
