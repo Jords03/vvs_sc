@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.01"
+SCRIPT_VERSION = "0.0.1.013"
 SCRIPT_VERSION_CODE = 00001
 
 --local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
