@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.012"
+SCRIPT_VERSION = "0.0.1.01"
 SCRIPT_VERSION_CODE = 00001
 
 --local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -14,6 +14,7 @@ local SC_CALLIN_THRESHOLD_END = 0.75
 local sim
 local currentSession
 local timeAccumulator
+local waitTimer = 0
 
 --latch variables
 local waitingToInitialize = true
@@ -44,6 +45,17 @@ end
 local scState = "inactive"
 local safetyCar
 local adminCars={}
+
+
+--message send retry stuff
+local waitForSuccessfulSendTimer = -1
+local lastMessage = ""
+
+
+
+
+
+
 
 --get the id of the SC
 local function getSafetyCar()
@@ -79,9 +91,106 @@ local function ensureSimAndSafetyCar()
     return true
 end
 
+--send SC message and retry if fails
+local function sendMessageWithRetry(message)
+    if ac.sendChatMessage(message) then
+        waitForSuccessfulSendTimer = -1
+        lastMessage = ""
+    else
+        waitForSuccessfulSendTimer = timeAccumulator
+        lastMessage = message
+    end
+end
+
+
+--jump SC to start line to rectify stuck issues
+local function jumpSCToStartLine()
+    writeLog("Jumping SC to start line to rectify borking")
+
+    local scTrackPos = 0
+
+    local function normalize_position(C, L, R)
+        if C <= L then
+            return -1 + (C / L)  -- Map to -1 to 0
+        else
+            return 0 + ((C - L) / R)  -- Map to 0 to +1
+        end
+    end
+    
+    -- Get track sides and calculate total track width
+    local scTrackSides = ac.getTrackAISplineSides(scTrackPos)
+    local leftDistance = scTrackSides.x
+    local rightDistance = scTrackSides.y
+    local trackCenter = (leftDistance + rightDistance) / 2
+    local normalizedTrackCenter = normalize_position(trackCenter, leftDistance, rightDistance)
+
+    -- Calculate world coordinates
+    local scTrackProgressWorld = ac.trackCoordinateToWorld(vec3(normalizedTrackCenter, 0, scTrackPos))
+
+    local trackProgress = ac.worldCoordinateToTrackProgress(scTrackProgressWorld)
+    local worldDirection = (ac.trackProgressToWorldCoordinate(trackProgress - 1 / sim.trackLengthM) - ac.trackProgressToWorldCoordinate(trackProgress)):normalize()
+
+    -- Set the safety car position and orientation
+    physics.setCarPosition(safetyCar.index, scTrackProgressWorld, worldDirection)
+
+end
+
+local scInactiveState = {
+    autopilotOn = false,
+    scTopSpeed = 10,
+    pitStopRequest = false,
+    lightsOn = false,
+    throttleLimit = 0.65,
+    aggression = 0.8
+}
+
+local scWaitingToRollingState = {
+    autopilotOn = false,
+    scTopSpeed = 10,
+    pitStopRequest = false,
+    lightsOn = true,
+    throttleLimit = 0.65,
+    aggression = 0.8
+}
+
+local scRollingState = {
+    autopilotOn = true,
+    scTopSpeed = 100,
+    pitStopRequest = false,
+    lightsOn = true,
+    throttleLimit = 0.5,
+    aggression = 0.8
+}
+
+local scRollingComingInState = {
+    autopilotOn = true,
+    scTopSpeed = 180,
+    pitStopRequest = true,
+    lightsOn = true,
+    throttleLimit = 0.5,
+    aggression = 0.8
+}
+
+local scRollingInPitLaneState = {
+    autopilotOn = true,
+    scTopSpeed = 25,
+    pitStopRequest = true,
+    lightsOn = true,
+    throttleLimit = 0.5,
+    aggression = 0.8
+}
+
 --set SC to given values
-local function setSCValues(autopilotOn, scTopSpeed, pitStopRequest, lightsOn, throttleLimit, aggression)
+local function setSCValues(state)
     writeLog("Setting Safety car values...")
+
+    local autopilotOn = state.autopilotOn
+    local scTopSpeed = state.scTopSpeed
+    local pitStopRequest = state.pitStopRequest
+    local lightsOn = state.lightsOn
+    local throttleLimit = state.throttleLimit
+    local aggression = state.aggression
+
     physics.setCarAutopilot(autopilotOn, false)
     physics.setAIPitStopRequest(safetyCar.index, pitStopRequest)
     physics.setAITopSpeed(safetyCar.index, scTopSpeed)
@@ -102,7 +211,7 @@ local function initialize()
     getAdminCars()
 
     --init SC car control state
-    setSCValues(false, 10, false, false, 0.65, 0.8)
+    setSCValues(scInactiveState)
 
     -- Set track length dependent thresholds
     local trackLength = sim.trackLengthM
@@ -112,8 +221,16 @@ local function initialize()
         writeLog("SC: Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
     end
 
+    --log out session duration
+    if currentSession then    
+        writeLog("Session Duration: " .. tostring(currentSession.durationMinutes))
+    end
+
     scState = "inactive"
     waitingToInitialize = true
+
+    waitForSuccessfulSendTimer = -1
+    lastMessage = ""
 end
 
 --called every frame
@@ -122,9 +239,12 @@ function script.update(dt)
     -- Total time passed - used for controlling delayed stuff
     timeAccumulator = timeAccumulator + dt
 
-    --log out session duration
-    if currentSession then    
-        writeLog("Session Duration: " .. tostring(currentSession.durationMinutes))
+    --message resend
+    if waitForSuccessfulSendTimer ~= -1 then
+        if timeAccumulator - waitForSuccessfulSendTimer > 1 then
+            writeLog("MESSAGE SEND FAILED - TRYING AGAIN")
+            sendMessageWithRetry(lastMessage)
+        end
     end
 
     --init routine - teleport to pits, open race menu, start car
@@ -134,6 +254,7 @@ function script.update(dt)
                 if ac.tryToOpenRaceMenu(nil) then
                     if ac.tryToStart() then
                         waitingToInitialize = false
+                        waitTimer = timeAccumulator
                         writeLog("Safety Car Initialisation successful")
                     else
                         writeLog("WARNING: try to start failed")
@@ -149,6 +270,81 @@ function script.update(dt)
             end
         end
     end
+
+    --don't do anything for first 2 seconds after initialisation
+    if timeAccumulator-waitTimer < 2 then
+        return
+    end
+
+    --test harness to kick off rolling start
+    --for rolling starts it will go: inactive -> waitingForRollingStart -> rolling -> rollingComingIn -> rollingInPitLane -> inactive
+    if scState == "inactive" then
+        jumpSCToStartLine()
+        writeLog("SC State Transitioning from " .. scState .. " to waitingForRollingStart")
+        scState = "waitingForRollingStart"
+        setSCValues(scWaitingToRollingState)
+        sendMessageWithRetry("SC: Safety Car rolling start")
+
+        --test harness
+        waitTimer = timeAccumulator
+        
+        return
+    end
+
+    --test harness - 2 secs after start jump start the rolling start
+    if scState == "waitingForRollingStart" then
+        if timeAccumulator-waitTimer < 2 then
+            return
+        end
+
+        writeLog("SC State Transitioning from " .. scState .. " to rolling")
+        scState = "rolling"
+        setSCValues(scRollingState)
+
+        --test
+        waitTimer = timeAccumulator
+
+        return
+    end
+
+    --test harness - 10 secs after start call it in
+    if scState == "rolling" then
+        if timeAccumulator-waitTimer < 10 then
+            return
+        end
+        writeLog("SC State Transitioning from " .. scState .. " to rollingComingIn")
+        scState = "rollingComingIn"
+        setSCValues(scRollingComingInState)
+        sendMessageWithRetry("SC: Safety Car in this lap")
+        return
+    end
+
+    --if SC coming in then wait until it enters the pit lane and send the clear message
+    if scState == "rollingComingIn" then
+        if safetyCar.isInPitlane then 
+            writeLog("SC State Transitioning from " .. scState .. " to rollingInPitLane")
+            scState = "rollingInPitLane"
+            setSCValues(scRollingInPitLaneState)
+            sendMessageWithRetry("SC: Safety Car is clear")
+            return
+        else
+            return
+        end
+    end
+
+    --if SC has made it to the pit box then set as inactive
+    if scState == "rollingInPitLane" then
+        if safetyCar.isInPit then
+            writeLog("SC State Transitioning from " .. scState .. " to inactive")
+            scState = "inactiveX"
+            setSCValues(scInactiveState)
+            return
+        else
+            return
+        end
+    end
+
+
 end
 
 ac.onSessionStart(function(sessionIndex, restarted)
