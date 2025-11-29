@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.01"
+SCRIPT_VERSION = "0.0.1.012"
 SCRIPT_VERSION_CODE = 00001
 
 --local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -89,7 +89,7 @@ local function setSCValues(autopilotOn, scTopSpeed, pitStopRequest, lightsOn, th
     ac.setExtraSwitch(1, lightsOn)
     physics.setAIThrottleLimit(safetyCar.index, throttleLimit)
     physics.setAIAggression(safetyCar.index, aggression)
-    writeLog("...Safety car values set - autoPilot: " .. tostring(autopilotOn) .. " | topSpeed: " .. tostring(scTopSpeed) .. " | pitStopReq: " .. tostring(pitStopRequest) .. " | lights: " .. tostring(lightsOn) .. " | throttleLimit: " .. tostring(throttleLimit) .. " | aggression: " + tostring(aggression))
+    writeLog("...Safety car values set - autoPilot: " .. tostring(autopilotOn) .. " | topSpeed: " .. tostring(scTopSpeed) .. " | pitStopReq: " .. tostring(pitStopRequest) .. " | lights: " .. tostring(lightsOn) .. " | throttleLimit: " .. tostring(throttleLimit) .. " | aggression: " .. tostring(aggression))
 end
 
 --(re)init all variables
