@@ -3,10 +3,11 @@ SCRIPT_SHORT_NAME = "VVSSC2"
 SCRIPT_VERSION = "0.0.1.01"
 SCRIPT_VERSION_CODE = 00001
 
---local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
---local safetyCarName = "Safety Car"
-local adminNames = {"Jon Astrop", "Dominic Fovargue"}
-local safetyCarName = "Nigel Walters"
+local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
+local safetyCarName = "Safety Car"
+--for local testing by Nigel
+--local adminNames = {"Jon Astrop", "Dominic Fovargue"}
+--local safetyCarName = "Nigel Walters"
 
 
 local SC_CALLIN_THRESHOLD_START = 0.5
@@ -114,7 +115,7 @@ local function tableContains(testTable, value)
 
 --Jump SC to strart line for rolling start
 local function jumpSCtoStart()
-    writeLog("SC: Jumping SC to start")
+    writeLog("Jumping SC to start for rolling start")
     local scMetersAhead = 25
     local scTrackPos = scMetersAhead / sim.trackLengthM
 
@@ -311,7 +312,7 @@ local function initialize()
     if trackLength >= 3500 then
         SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
         SC_CALLIN_THRESHOLD_END = 1 - (750 / trackLength)
-        writeLog("SC: Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
+        writeLog("Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
     end
 
     --log out session duration
@@ -333,7 +334,7 @@ end
 -- Calculates the average best lap time of up to three drivers on the leaderboard.
 local function calculateAverageBestLapTime(session)
     if not (session and session.leaderboard and #session.leaderboard > 0) then
-        writeLog("SC: No drivers in the leaderboard to calculate the average.")
+        writeLog("No drivers in the leaderboard to calculate the average.")
         return nil
     end
 
@@ -419,7 +420,7 @@ local function canSafetyCarComeIn()
 
     --if we are at the end then call it in whatever
     if sim.timeRaceEnded or sim.leaderLastLap then
-        writeLog("SC: Safety Car is heading to pits at end of session")
+        writeLog("Safety Car is heading to pits at end of session")
         return true
     end
 
@@ -436,15 +437,15 @@ local function canSafetyCarComeIn()
         if car ~= safetyCar then
             --10KMH check
             if car.speedKmh <= 10 then
-                writeLog("SC: " .. car:driverName() .. " is too slow to be counted (under 10KMH)")
+                writeLog(car:driverName() .. " is too slow to be counted (under 10KMH)")
             else
                 --pitlane check
                 if car.isInPitlane or car.isInPit then
-                    writeLog("SC: " .. car:driverName() .. " is in pitlane")
+                    writeLog(car:driverName() .. " is in pitlane")
                 else
                     --retired check
                     if car.isRetired then
-                        writeLog("SC: " .. car:driverName() .. " is retired")
+                        writeLog(car:driverName() .. " is retired")
                     else
                         activeCarArray[activeCarCount] = car
                         activeCarCount = activeCarCount + 1
@@ -453,7 +454,7 @@ local function canSafetyCarComeIn()
             end
         end
     end
-    writeLog("SC: Active cars: " .. activeCarCount)
+    writeLog("Active cars: " .. activeCarCount)
 
     --check if all active cars are within threshold - SC can only come in if ALL active cars are within the threshold
     local distanceThresholdMeters = (activeCarCount + 3) * 28
@@ -489,10 +490,10 @@ local function processChatMessage(message, senderCarIndex)
             setSCValues(scWaitingToRollingState)
             sendMessageWithRetry("SC: Safety Car rolling start")
         elseif message == "SC teston" then
-            writeLog("SC: Safety Car Test On")
+            writeLog("Safety Car Test On")
             sendMessageWithRetry("SC: Test On")
         elseif message == "SC testoff" then
-            writeLog("SC: Safety Car Test Off")
+            writeLog("Safety Car Test Off")
             sendMessageWithRetry("SC: Test Off")
         end
     end
@@ -620,7 +621,7 @@ function script.update(dt)
         if sharedData.safetyCarCallout then
             sharedData.safetyCarCallout = false
             callSafetyCar()
-            writeLog("SC: SC scon received from shared data")
+            writeLog("SC scon received from shared data")
         end
 
         --refresh the trustable spline lists
@@ -681,7 +682,7 @@ function script.update(dt)
                 local scSpeedUpDistance = (lcSpeed * 120) / 100
 
                 if lcDistance <= scSpeedUpDistance then
-                    writeLog("SC: Leader gap to Safety Car within threshold : " .. lcDistance .. "m @" .. lcSpeed)
+                    writeLog("Leader gap to Safety Car within threshold : " .. lcDistance .. "m @" .. lcSpeed)
                     writeLog("SC State Transitioning from " .. scState .. " to onTrackWaitingForCallIn")
                     scState = "onTrackWaitingForCallIn"
                     setSCValues(scOnTrackWaitingForCallInState)
