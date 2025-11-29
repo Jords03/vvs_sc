@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.012"
+SCRIPT_VERSION = "0.0.1.019"
 SCRIPT_VERSION_CODE = 00001
 
 --local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -318,19 +318,18 @@ function script.update(dt)
     if scState == "rollingComingIn" then
 
         if scLapCountWhenCalledIn < safetyCar.lapCount then
-                writeLog("Safety Car has not pitted when it should have!")
-                writeLog("SC Missed pit lane - teleporting attempt")
-                if ac.tryToTeleportToPits() then
-                    writeLog("SC reset in pits successful")
-                    writeLog("SC State Transitioning from " .. scState .. " to inactive")
-                    scState = "inactiveX"
-                    setSCValues(scInactiveState)
-                    sendMessageWithRetry("SC: Safety Car is clear")
-                    return
-                else
-                    writeLog("SC reset in pits failed")
-                    return
-                end
+            writeLog("Safety Car has not pitted when it should have!")
+            writeLog("SC Missed pit lane - teleporting attempt")
+            if ac.tryToTeleportToPits() then
+                writeLog("SC reset in pits successful")
+                writeLog("SC State Transitioning from " .. scState .. " to inactive")
+                scState = "inactiveX"
+                setSCValues(scInactiveState)
+                sendMessageWithRetry("SC: Safety Car is clear")
+                return
+            else
+                writeLog("SC reset in pits failed")
+                return
             end
         end
 
@@ -368,8 +367,6 @@ function script.update(dt)
             return
         end
     end
-
-
 end
 
 ac.onSessionStart(function(sessionIndex, restarted)
