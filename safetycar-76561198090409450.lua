@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.013"
+SCRIPT_VERSION = "0.0.1.01"
 SCRIPT_VERSION_CODE = 00001
 
 --local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -50,12 +50,6 @@ local adminCars={}
 --message send retry stuff
 local waitForSuccessfulSendTimer = -1
 local lastMessage = ""
-
-
-
-
-
-
 
 --get the id of the SC
 local function getSafetyCar()
@@ -333,6 +327,18 @@ function script.update(dt)
 
     --if SC has made it to the pit box then set as inactive
     if scState == "rollingInPitLane" then
+
+        --sanity check, is SC speed has dropped to zero then deal with it
+         if safetyCar.speedMs < 0.0001 and not safetyCar.isInPit then
+            writeLog("Safety Car has stopped unexpectedly!")
+            writeLog("SC STOP - teleporting attempt")
+            if ac.tryToTeleportToPits() then
+                writeLog("SC reset in pits successful")
+            else
+                writeLog("SC reset in pits failed")
+            end
+        end
+
         if safetyCar.isInPit then
             writeLog("SC State Transitioning from " .. scState .. " to inactive")
             scState = "inactiveX"
