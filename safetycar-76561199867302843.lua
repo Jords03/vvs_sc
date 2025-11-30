@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.03"
-SCRIPT_VERSION_CODE = 00003
+SCRIPT_VERSION = "0.0.1.04"
+SCRIPT_VERSION_CODE = 00004
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -753,6 +753,7 @@ function script.update(dt)
             writeLog("SC State Transitioning from " .. scState .. " to rolling")
             scState = "rolling"
             setSCValues(scRollingState)
+            sendMessageWithRetry("SC: Safety Car rolling start")
         end
         return
     end
@@ -792,9 +793,13 @@ function script.update(dt)
                 if ac.tryToTeleportToPits() then
                     writeLog("SC reset in pits successful")
                     writeLog("SC State Transitioning from " .. scState .. " to inactive")
-                    scState = "inactive"
-                    setSCValues(scInactiveState)
+                    --scState = "inactive"
+                    --setSCValues(scInactiveState)
                     sendMessageWithRetry("SC: Safety Car is clear")
+
+                    --XXX
+                    initialize()
+
                     halfSecStateCheckWaitTimer = timeAccumulator
                     return
                 else
@@ -835,8 +840,10 @@ function script.update(dt)
 
             if safetyCar.isInPit then
                 writeLog("SC State Transitioning from " .. scState .. " to inactive")
-                scState = "inactive"
-                setSCValues(scInactiveState)
+                --XXX
+                --scState = "inactive"
+                --setSCValues(scInactiveState)
+                initialize()
             end
 
             halfSecStateCheckWaitTimer = timeAccumulator
