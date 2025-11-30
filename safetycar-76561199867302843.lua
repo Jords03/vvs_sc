@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.04"
-SCRIPT_VERSION_CODE = 00004
+SCRIPT_VERSION = "0.0.1.05"
+SCRIPT_VERSION_CODE = 00005
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -24,6 +24,7 @@ local trustableSplinePostionsById = {}
 
 --latch variables
 local waitingToInitialize = true
+local waitingToSendClearMessageBeforeInitialization = false
 
 --shared data structure for real car data
 local sharedData = ac.connect({
@@ -291,6 +292,9 @@ end
 
 --(re)init all variables
 local function initialize()
+
+    writeLog("Safety Car Script Initializing")
+
     timeAccumulator = 0
     scCalledLeavingPitsTimer = 0
     halfSecWaitTimer = 0
@@ -320,11 +324,14 @@ local function initialize()
 
     scState = "inactive"
     waitingToInitialize = true
+    waitingToSendClearMessageBeforeInitialization = false
 
     waitForSuccessfulSendTimer = -1
     lastMessage = ""
 
     trustableSplinePostionsById = {}
+
+    writeLog("Safety Car Script Initialized on Session Start")
 end
 
 
@@ -679,8 +686,6 @@ function script.update(dt)
                         writeLog("Track clear, jumping SC to start finish")
                         jumpSCToStartLine()
                     end
-                else
-                    writeLog("SC Not Borked, happy days")
                 end
             end
 
@@ -784,6 +789,14 @@ function script.update(dt)
     --if SC coming in then wait until it enters the pit lane and send the clear message
     if scState == "comingIn" then
 
+        --check if we are still trying to send the clear message - once it's successfully sent then initialize
+        if waitingToSendClearMessageBeforeInitialization then
+            if waitForSuccessfulSendTimer == -1 then
+                writeLog("SC State Transitioning from " .. scState .. " to inactive (via reinitialization)")
+                initialize()
+            end
+        end
+
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
@@ -792,13 +805,13 @@ function script.update(dt)
                 writeLog("SC Missed pit lane - teleporting attempt")
                 if ac.tryToTeleportToPits() then
                     writeLog("SC reset in pits successful")
-                    writeLog("SC State Transitioning from " .. scState .. " to inactive")
-                    --scState = "inactive"
-                    --setSCValues(scInactiveState)
+                    
                     sendMessageWithRetry("SC: Safety Car is clear")
 
-                    --XXX
-                    initialize()
+                    --here we want to initialize to reset the SC - we can't do it immediately though as we don't know for sure
+                    --that the clear message has successfully been sent - set this latch then on the next frames
+                    --test for successful transmission and then initialize
+                    waitingToSendClearMessageBeforeInitialization = true
 
                     halfSecStateCheckWaitTimer = timeAccumulator
                     return
@@ -824,6 +837,16 @@ function script.update(dt)
     --if SC has made it to the pit box then set as inactive
     if scState == "backToPitLane" then
 
+        --SC likes to crash as it enters its pit box, detect this based on the steering angle and just jump it to pits
+        if safetyCar.steer < 3 or safetyCar.steer > -3 then
+            writeLog("SC PIT BOX HACK - teleporting attempt")
+            if ac.tryToTeleportToPits() then
+                writeLog("SC reset in pits successful")
+            else
+                writeLog("SC reset in pits failed")
+            end
+        end
+
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
@@ -839,10 +862,7 @@ function script.update(dt)
             end
 
             if safetyCar.isInPit then
-                writeLog("SC State Transitioning from " .. scState .. " to inactive")
-                --XXX
-                --scState = "inactive"
-                --setSCValues(scInactiveState)
+                writeLog("SC State Transitioning from " .. scState .. " to inactive (via a reinitializtion)")
                 initialize()
             end
 
@@ -854,9 +874,7 @@ function script.update(dt)
 end
 
 ac.onSessionStart(function(sessionIndex, restarted)
-    writeLog("Safety Car Script Initializing")
     initialize()
-    writeLog("Safety Car Script Initialized on Session Start")
 end)
 
 initialize()
