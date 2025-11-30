@@ -332,6 +332,8 @@ local function initialize()
 
     trustableSplinePostionsById = {}
 
+    physics.disableCarCollisions(safetyCar.index, true, true)
+
     writeLog("Safety Car Script Initialized on Session Start")
 end
 
