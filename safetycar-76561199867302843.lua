@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.05"
-SCRIPT_VERSION_CODE = 00005
+SCRIPT_VERSION = "0.0.1.06"
+SCRIPT_VERSION_CODE = 00006
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -53,6 +53,7 @@ local scState = "inactive"
 local safetyCar
 local adminCars={}
 local scLapCountWhenCalledIn = -1
+local scLapCountWhenCalledOut = -1
 
 --message send retry stuff
 local waitForSuccessfulSendTimer = -1
@@ -429,6 +430,12 @@ local function canSafetyCarComeIn()
         return true
     end
 
+    --if the SC has done more than 2 laps then call it in
+    if safetyCar.lapCount - scLapCountWhenCalledOut >= 2 then
+        writeLog("Safety Car is heading to pits as its been out for too many laps")
+        return true
+    end
+
     --track and build an array of active cars - to be active you must be going at over 10KMH
     --not be in the pits or the pit lane, and not be retired, and not be the SC 
 
@@ -651,7 +658,7 @@ function script.update(dt)
                 writeLog("ERROR: Safety car is inactive but not in the pit!")
                 initialize()
                 if safetyCar.speedMs > 0.1 then
-                    writeLog("ERROR: Safety car is inactive but not in the pit!")
+                    writeLog("ERROR: Safety car is inactive but is moving!")
                     initialize()
                 end
             end
@@ -667,12 +674,13 @@ function script.update(dt)
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
-            --happy path - SC manages to leave the pits
+            --happy path - SC manages to leave the pits - this will also get invoked if it borks and is jumped out
             if not safetyCar.isInPitlane then
                 writeLog("SC State Transitioning from " .. scState .. " to onTrackWaitingForLeader")
                 scState = "onTrackWaitingForLeader"
                 setSCValues(scOnTrackWaitingForLeaderState)
                 sendMessageWithRetry("SC: Safety Car deployed")
+                scLapCountWhenCalledOut = safetyCar.lapCount
                 halfSecStateCheckWaitTimer = timeAccumulator
                 return
             end
@@ -763,7 +771,7 @@ function script.update(dt)
         return
     end
 
-    --SC is rolling round for the rolling start, once it gets within the threshold then call it back to pits
+    --SC is rolling round for the rolling start (or waiting for the green light for race start), once it gets within the threshold then call it back to pits
     if scState == "rolling" then
 
         --only do this every 0.5 secs
@@ -861,6 +869,7 @@ function script.update(dt)
                 end
             end
 
+            --once we are back in the pit box (whether jumped there or driven there) then reinitialize
             if safetyCar.isInPit then
                 writeLog("SC State Transitioning from " .. scState .. " to inactive (via a reinitializtion)")
                 initialize()
