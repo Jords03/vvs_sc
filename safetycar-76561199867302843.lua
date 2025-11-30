@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.02"
-SCRIPT_VERSION_CODE = 00002
+SCRIPT_VERSION = "0.0.1.03"
+SCRIPT_VERSION_CODE = 00003
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -460,7 +460,7 @@ local function canSafetyCarComeIn()
     for pos=0,activeCarCount-1,1 do
         car = activeCarArray[pos]
         local distanceToSC = calculateDistanceToSC(trustableSplinePostionsById[car.index], trustableSplinePostionsById[safetyCar.index])
-        local distanceMeters = distanceToSC * sim.trackLength
+        local distanceMeters = distanceToSC * sim.trackLengthM
         if distanceMeters > distanceThresholdMeters then
             writeLog(car:driverName() .. " is too far behind, SC cannot come in")
             return false
@@ -563,7 +563,7 @@ local function getLeadingCarBehindSC()
         local carSplinePos = trustableSplinePostionsById[leadingCarNotInPit.index]
         local distance = calculateDistanceToSC(carSplinePos, scSplinePos)
 
-        distanceMeters = distance * sim.trackLength
+        distanceMeters = distance * sim.trackLengthM
         ac.debug("SC: LC distance to SC:", distanceMeters)
         ac.debug("SC: scSplinePos:", scSplinePos)
     else
