@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.10"
-SCRIPT_VERSION_CODE = 00010
+SCRIPT_VERSION = "0.0.1.11"
+SCRIPT_VERSION_CODE = 00011
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -207,11 +207,11 @@ local scInactiveState = {
 }
 
 local scWaitingToRollingState = {
-    autopilotOn = false,
-    scTopSpeed = 10,
+    autopilotOn = true,
+    scTopSpeed = 100,
     pitStopRequest = false,
     lightsOn = true,
-    throttleLimit = 0.65,
+    throttleLimit = 0.5,
     aggression = 0.8
 }
 
@@ -289,7 +289,8 @@ local function setSCValues(state)
     physics.setAIThrottleLimit(safetyCar.index, throttleLimit)
     physics.setAIAggression(safetyCar.index, aggression)
 
-    physics.disableCarCollisions(safetyCar.index, true, false)
+    --DOES NOT WORK
+    --physics.disableCarCollisions(safetyCar.index, true, false)
     writeLog("...Safety car values set - autoPilot: " .. tostring(autopilotOn) .. " | topSpeed: " .. tostring(scTopSpeed) .. " | pitStopReq: " .. tostring(pitStopRequest) .. " | lights: " .. tostring(lightsOn) .. " | throttleLimit: " .. tostring(throttleLimit) .. " | aggression: " .. tostring(aggression))
 end
 
@@ -661,6 +662,9 @@ function script.update(dt)
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
+            --reapply the current state to ensure it's set
+            setSCValues(scInactiveState)
+
             if not safetyCar.isInPitlane then
                 writeLog("ERROR: Safety car is inactive but not in the pit!")
                 initialize()
@@ -680,6 +684,9 @@ function script.update(dt)
 
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
+
+            --reapply the current state to ensure it's set
+            setSCValues(scCalledLeavingPitsState)
 
             --happy path - SC manages to leave the pits - this will also get invoked if it borks and is jumped out
             if not safetyCar.isInPitlane then
@@ -722,6 +729,9 @@ function script.update(dt)
 
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
+
+            --reapply the current state to ensure it's set
+            setSCValues(scOnTrackWaitingForLeaderState)
     
             local lc, lcDistance = getLeadingCarBehindSC()
             if lc then
@@ -747,6 +757,9 @@ function script.update(dt)
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
+            --reapply the current state to ensure it's set
+            setSCValues(scOnTrackWaitingForCallInState)
+
             local scSplinePos = safetyCar.splinePosition
             if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
                 if canSafetyCarComeIn() then
@@ -769,6 +782,7 @@ function script.update(dt)
 
     --Setting SC rolling start values 15 secs before race start
     if scState == "waitingForRollingStart" then
+
         if sim.timeToSessionStart <= 15000 then
             writeLog("SC State Transitioning from " .. scState .. " to rolling")
             scState = "rolling"
@@ -783,6 +797,9 @@ function script.update(dt)
 
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
+
+            --reapply the current state to ensure it's set
+            setSCValues(scRollingState)
 
             local scSplinePos = safetyCar.splinePosition
             if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
@@ -814,6 +831,9 @@ function script.update(dt)
 
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
+
+            --reapply the current state to ensure it's set
+            setSCValues(scComingInState)
 
             if scLapCountWhenCalledIn < safetyCar.lapCount then
                 writeLog("Safety Car has not pitted when it should have!")
@@ -864,6 +884,9 @@ function script.update(dt)
 
         --only do this every 0.5 secs
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
+
+            --reapply the current state to ensure it's set
+            setSCValues(scBackToPitLaneState)
 
             --sanity check, is SC speed has dropped to zero then deal with it
             if safetyCar.speedMs < 0.1 and not safetyCar.isInPit then
