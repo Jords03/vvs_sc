@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.061"
-SCRIPT_VERSION_CODE = 00006
+SCRIPT_VERSION = "0.0.1.07"
+SCRIPT_VERSION_CODE = 00007
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -332,7 +332,7 @@ local function initialize()
 
     trustableSplinePostionsById = {}
 
-    physics.disableCarCollisions(safetyCar.index, true, true)
+    --physics.disableCarCollisions(safetyCar.index, true, true)
 
     writeLog("Safety Car Script Initialized on Session Start")
 end
