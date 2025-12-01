@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.08"
-SCRIPT_VERSION_CODE = 00008
+SCRIPT_VERSION = "0.0.1.09"
+SCRIPT_VERSION_CODE = 00009
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -288,6 +288,8 @@ local function setSCValues(state)
     ac.setExtraSwitch(1, lightsOn)
     physics.setAIThrottleLimit(safetyCar.index, throttleLimit)
     physics.setAIAggression(safetyCar.index, aggression)
+
+    physics.disableCarCollisions(safetyCar.index, true, true)
     writeLog("...Safety car values set - autoPilot: " .. tostring(autopilotOn) .. " | topSpeed: " .. tostring(scTopSpeed) .. " | pitStopReq: " .. tostring(pitStopRequest) .. " | lights: " .. tostring(lightsOn) .. " | throttleLimit: " .. tostring(throttleLimit) .. " | aggression: " .. tostring(aggression))
 end
 
@@ -331,8 +333,6 @@ local function initialize()
     lastMessage = ""
 
     trustableSplinePostionsById = {}
-
-    physics.disableCarCollisions(safetyCar.index, true, true)
 
     writeLog("Safety Car Script Initialized on Session Start")
 end
@@ -853,7 +853,7 @@ function script.update(dt)
     if scState == "backToPitLane" then
 
         --SC likes to crash as it enters its pit box, detect this based on the steering angle and just jump it to pits
-        if safetyCar.steer < 3 or safetyCar.steer > -3 then
+        if safetyCar.speedKmh < 50 and (safetyCar.steer < 3 or safetyCar.steer > -3) then
             writeLog("SC PIT BOX HACK - teleporting attempt")
             if ac.tryToTeleportToPits() then
                 writeLog("SC reset in pits successful")
