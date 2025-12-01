@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.11"
-SCRIPT_VERSION_CODE = 00011
+SCRIPT_VERSION = "0.0.1.12"
+SCRIPT_VERSION_CODE = 00012
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -271,8 +271,10 @@ local scOnTrackWaitingForCallInState = {
 
 
 --set SC to given values
-local function setSCValues(state)
-    writeLog("Setting Safety car values...")
+local function setSCValues(state, logValues)
+    if logValues then
+        writeLog("Setting Safety car values...")
+    end
 
     local autopilotOn = state.autopilotOn
     local scTopSpeed = state.scTopSpeed
@@ -291,7 +293,9 @@ local function setSCValues(state)
 
     --DOES NOT WORK
     --physics.disableCarCollisions(safetyCar.index, true, false)
-    writeLog("...Safety car values set - autoPilot: " .. tostring(autopilotOn) .. " | topSpeed: " .. tostring(scTopSpeed) .. " | pitStopReq: " .. tostring(pitStopRequest) .. " | lights: " .. tostring(lightsOn) .. " | throttleLimit: " .. tostring(throttleLimit) .. " | aggression: " .. tostring(aggression))
+    if logValues then
+         writeLog("...Safety car values set - autoPilot: " .. tostring(autopilotOn) .. " | topSpeed: " .. tostring(scTopSpeed) .. " | pitStopReq: " .. tostring(pitStopRequest) .. " | lights: " .. tostring(lightsOn) .. " | throttleLimit: " .. tostring(throttleLimit) .. " | aggression: " .. tostring(aggression))
+    end
 end
 
 --(re)init all variables
@@ -311,7 +315,7 @@ local function initialize()
     getAdminCars()
 
     --init SC car control state
-    setSCValues(scInactiveState)
+    setSCValues(scInactiveState, true)
 
     -- Set track length dependent thresholds
     local trackLength = sim.trackLengthM
@@ -409,7 +413,7 @@ local function callSafetyCar()
 
     writeLog("SC State Transitioning from " .. scState .. " to calledLeavingPits")
     scState = "calledLeavingPits"
-    setSCValues(scCalledLeavingPitsState)
+    setSCValues(scCalledLeavingPitsState, true)
     scCalledLeavingPitsTimer = timeAccumulator
 
 end
@@ -506,7 +510,7 @@ local function processChatMessage(message, senderCarIndex)
                 jumpSCtoStart()
                 writeLog("SC State Transitioning from " .. scState .. " to waitingForRollingStart")
                 scState = "waitingForRollingStart"
-                setSCValues(scWaitingToRollingState)
+                setSCValues(scWaitingToRollingState, true)
                 sendMessageWithRetry("SC: Safety Car rolling start")
             end
         elseif message == "SC teston" then
@@ -663,7 +667,7 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scInactiveState)
+            setSCValues(scInactiveState, false)
 
             if not safetyCar.isInPitlane then
                 writeLog("ERROR: Safety car is inactive but not in the pit!")
@@ -686,13 +690,13 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scCalledLeavingPitsState)
+            setSCValues(scCalledLeavingPitsState, false)
 
             --happy path - SC manages to leave the pits - this will also get invoked if it borks and is jumped out
             if not safetyCar.isInPitlane then
                 writeLog("SC State Transitioning from " .. scState .. " to onTrackWaitingForLeader")
                 scState = "onTrackWaitingForLeader"
-                setSCValues(scOnTrackWaitingForLeaderState)
+                setSCValues(scOnTrackWaitingForLeaderState, true)
                 sendMessageWithRetry("SC: Safety Car deployed")
                 scLapCountWhenCalledOut = safetyCar.lapCount
                 halfSecStateCheckWaitTimer = timeAccumulator
@@ -716,7 +720,7 @@ function script.update(dt)
                 writeLog("Did not find a space to deploy borked SC after 2 minutes, aborting")
                 writeLog("SC State Transitioning from " .. scState .. " to inactive")
                 scState = "inactive"
-                setSCValues(scInactiveState)
+                setSCValues(scInactiveState, true)
             end
 
             halfSecStateCheckWaitTimer = timeAccumulator
@@ -731,7 +735,7 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scOnTrackWaitingForLeaderState)
+            setSCValues(scOnTrackWaitingForLeaderState, false)
     
             local lc, lcDistance = getLeadingCarBehindSC()
             if lc then
@@ -742,7 +746,7 @@ function script.update(dt)
                     writeLog("Leader gap to Safety Car within threshold : " .. lcDistance .. "m @" .. lcSpeed)
                     writeLog("SC State Transitioning from " .. scState .. " to onTrackWaitingForCallIn")
                     scState = "onTrackWaitingForCallIn"
-                    setSCValues(scOnTrackWaitingForCallInState)
+                    setSCValues(scOnTrackWaitingForCallInState, true)
                 end
             end
 
@@ -758,14 +762,14 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scOnTrackWaitingForCallInState)
+            setSCValues(scOnTrackWaitingForCallInState, false)
 
             local scSplinePos = safetyCar.splinePosition
             if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
                 if canSafetyCarComeIn() then
                     writeLog("SC State Transitioning from " .. scState .. " to comingIn")
                     scState = "comingIn"
-                    setSCValues(scComingInState)
+                    setSCValues(scComingInState, true)
                     scLapCountWhenCalledIn = safetyCar.lapCount
                     sendMessageWithRetry("SC: Safety Car in this lap")
                 end
@@ -786,7 +790,7 @@ function script.update(dt)
         if sim.timeToSessionStart <= 15000 then
             writeLog("SC State Transitioning from " .. scState .. " to rolling")
             scState = "rolling"
-            setSCValues(scRollingState)
+            setSCValues(scRollingState, true)
             sendMessageWithRetry("SC: Safety Car rolling start")
         end
         return
@@ -799,13 +803,13 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scRollingState)
+            setSCValues(scRollingState, false)
 
             local scSplinePos = safetyCar.splinePosition
             if scSplinePos > SC_CALLIN_THRESHOLD_START and scSplinePos <= SC_CALLIN_THRESHOLD_END then
                 writeLog("SC State Transitioning from " .. scState .. " to comingIn")
                 scState = "comingIn"
-                setSCValues(scComingInState)
+                setSCValues(scComingInState, true)
                 sendMessageWithRetry("SC: Safety Car in this lap")
                 scLapCountWhenCalledIn = safetyCar.lapCount
                 writeLog("SC Lap count at call in is: " .. tostring(scLapCountWhenCalledIn))
@@ -833,7 +837,7 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scComingInState)
+            setSCValues(scComingInState, false)
 
             if scLapCountWhenCalledIn < safetyCar.lapCount then
                 writeLog("Safety Car has not pitted when it should have!")
@@ -860,7 +864,7 @@ function script.update(dt)
             if safetyCar.isInPitlane then 
                 writeLog("SC State Transitioning from " .. scState .. " to backToPitLane")
                 scState = "backToPitLane"
-                setSCValues(scBackToPitLaneState)
+                setSCValues(scBackToPitLaneState, true)
                 sendMessageWithRetry("SC: Safety Car is clear")
             end
 
@@ -886,7 +890,7 @@ function script.update(dt)
         if timeAccumulator - halfSecStateCheckWaitTimer >= 0.5 then
 
             --reapply the current state to ensure it's set
-            setSCValues(scBackToPitLaneState)
+            setSCValues(scBackToPitLaneState, false)
 
             --sanity check, is SC speed has dropped to zero then deal with it
             if safetyCar.speedMs < 0.1 and not safetyCar.isInPit then
