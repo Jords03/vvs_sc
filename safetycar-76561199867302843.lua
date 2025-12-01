@@ -1,6 +1,6 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.06"
+SCRIPT_VERSION = "0.0.1.061"
 SCRIPT_VERSION_CODE = 00006
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -498,11 +498,16 @@ local function processChatMessage(message, senderCarIndex)
             writeLog("SC Killed - reinitializing")
             initialize()
         elseif message == "SC rolling" then
-            jumpSCtoStart()
-            writeLog("SC State Transitioning from " .. scState .. " to waitingForRollingStart")
-            scState = "waitingForRollingStart"
-            setSCValues(scWaitingToRollingState)
-            sendMessageWithRetry("SC: Safety Car rolling start")
+            --only do this if the race has not started yet
+            if sharedData.raceHasStarted then
+                writeLog("WARNING Rolling start called but race has already started, ignoring")
+            else
+                jumpSCtoStart()
+                writeLog("SC State Transitioning from " .. scState .. " to waitingForRollingStart")
+                scState = "waitingForRollingStart"
+                setSCValues(scWaitingToRollingState)
+                sendMessageWithRetry("SC: Safety Car rolling start")
+            end
         elseif message == "SC teston" then
             writeLog("Safety Car Test On")
             sendMessageWithRetry("SC: Test On")
