@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.2"
-SCRIPT_VERSION_CODE = 00002
+SCRIPT_VERSION = "0.0.1.3"
+SCRIPT_VERSION_CODE = 00003
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -636,7 +636,13 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                     scInThisLap()
                 --sc made it back to pits
                 elseif message == "SC: Safety Car is clear" then
-                    scIsClear()
+                    --don't do this transition if we are on a rollingComingIn
+                    if scFlagsState.status == "rollingComingIn" then
+                        writeLog("Ignoring is clear message as in rolling start")
+                    else
+                        scIsClear()
+                    end
+                    
                 --sc being killed
                 elseif message == "SC kill" then
                     writeLog("SC Flags: Recieved - SC kill")
