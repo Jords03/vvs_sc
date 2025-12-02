@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.3"
-SCRIPT_VERSION_CODE = 00003
+SCRIPT_VERSION = "0.0.1.4"
+SCRIPT_VERSION_CODE = 00004
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -638,6 +638,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 elseif message == "SC: Safety Car is clear" then
                     --don't do this transition if we are on a rollingComingIn
                     if scFlagsState.status == "rollingComingIn" then
+                        --just update the status text
+                        scFlagsState.statusText = "WATCH FOR GREEN FLAG"
                         writeLog("Ignoring is clear message as in rolling start")
                     else
                         scIsClear()
