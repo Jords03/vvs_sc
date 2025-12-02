@@ -1,16 +1,118 @@
-local debug = false
-local version = "1.0.2"
+SCRIPT_NAME = "VVS Safety Car Flags Mark2"
+SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
+SCRIPT_VERSION = "0.0.1.1"
+SCRIPT_VERSION_CODE = 00001
 
--- Get states
-local sim = ac.getSim()
-local currentSession = ac.getSession(sim.currentSessionIndex)
-local driverCar = ac.getCar(0)
-local safetyCarName = "Safety Car"
---local safetyCarName = "VVS SafetyCar" --this is the old skin ui name, have renamed
-local safetyCar = nil
+--####################################################################################################
+--####################################### GLOBALS ####################################################
+--####################################################################################################
+
+--CONSTANTS
 local adminCarNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
-local adminCars = {}
+local safetyCarName = "Safety Car"
+--distance you should be within when following
+local distanceThreshold = 16
+--distance multiplier - controls where we switch to catch up message rather than close gap
+local distanceThresholdMultiplier = 2.5
+
+--VARIABLES WE NEED TO REINIT
+
+--timers
+local timeAccumulator = 0
+local thirdSecWaitTimer = 0
+local halfSecWaitTimer = 0
+local tenthSecWaitTimer = 0
+local goGreenTimer = 0
+
+--track race leader
+local raceLeaderCar = nil
+local prevRaceLeaderCar = nil
+local leaderChangedLastBeat = false
+local raceLeaderLapCount = -1
+
+--sim stuff
+local sim = ac.getSim()
 local trackLength = sim.trackLengthM
+local driverCar = ac.getCar(0)
+
+--we will use scFlagsState.status to track the current state of the SC Flags
+--for rolling starts it will go: inactive -> rolling -> rollingComingIn -> green -> inactive
+--for normal SC callouts it will go: inactive -> deployed -> comingIn -> clear -> green -> inactive
+local scFlagsState = {
+    status = "inactive",
+    headingText = "", --shown at the very top of the normal flag box
+    headingTextColor = rgbm.colors.black, -- heading text colour
+    statusText = "", --Main display text / top line of the coming in box
+    statusTextColor = rgbm.colors.black, -- status text colour
+    speedText = "", --only shown on the coming in box, in the middle
+    helperText = "", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+    leaderText = "", --Special sub text for the leader
+    flagColor = rgbm.colors.yellow -- flag colour   
+}
+
+--END OF VARIABLES WE NEED TO REINIT
+
+
+--####################################################################################################
+--####################################### UTILITIES ##################################################
+--####################################################################################################
+
+--utility function to write log messages
+local function writeLog(message)
+    local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
+    ac.log(timeStamp .. " | " .. SCRIPT_VERSION .. " | SCFLAGS: " .. message)
+end
+
+--utility function to check if a table contains a value
+local function tableContains(testTable, value)
+    for i = 1,#testTable do
+      if (testTable[i] == value) then
+        return true
+      end
+    end
+    return false
+  end
+
+
+--####################################################################################################
+--####################################### SPECIAL CARS ###############################################
+--#################################################################################################### 
+
+--getAdminAndSafetyCars variables
+local safetyCar
+local adminCars = {}
+
+-- Get states from nil checks and late connections
+local function getAdminAndSafetyCars()
+
+    local newSafetyCar
+    local safetyCarID = ac.getCarByDriverName(safetyCarName)
+    if safetyCarID then
+        newSafetyCar = ac.getCar(safetyCarID)
+        if newSafetyCar then
+            if newSafetyCar.isConnected then
+                if newSafetyCar ~= safetyCar then
+                    writeLog("SC Flags: SC identified as:" .. safetyCarID)
+                    safetyCar = newSafetyCar
+                end
+            end
+        end
+    end
+
+    adminCars = {}
+    for i,v in ipairs(adminCarNames) do
+        local adminCarID = ac.getCarByDriverName(v)
+        if adminCarID then
+            table.insert(adminCars,adminCarID)
+        end
+    end
+
+end
+
+
+--####################################################################################################
+--####################################### SETTINGS ###################################################
+--####################################################################################################
 
 --shared data structure for sc flags settings
 local scFlagsValues = ac.connect({
@@ -19,96 +121,10 @@ local scFlagsValues = ac.connect({
     settingsOpen = ac.StructItem.boolean()
 }, true, ac.SharedNamespace.Shared)
 
--- Safety Car state variables
-local scState = {
-    deployed = "DEPLOYED",
-    returning = "ENDING",
-    enteringPit = "CLEAR",
-    inPit = "IN PITBOX",
-    getReady = "GET READY",
-    rollingStart = "ROLLING START",
-    test = "TEST",
-    off = "",
-    settings = "SETTINGS"
-}
 
-local scHeadingTextState = {
-    sc = "SAFETY CAR",
-    green = "GREEN FLAG",
-    test = "TEST"
-}
-
-local scRollingTextState = {
-    start = "FOLLOW IN SINGLE FILE",
-    ending = "WATCH FOR GREEN FLAG",
-    maintain = "MAINTAIN YOUR SPEED",
-    off = ""
-}
-
-local scLeaderTextState = {
-    leader = "YOU ARE RACE LEADER",
-    maintain = "MAINTAIN YOUR SPEED",
-    goAnyTime = "GO AT ANY TIME",
-    watch = "GET READY",
-    off = ""
-}
-
-local scHelperTextState = {
-    catchSC = "CATCH THE SAFETY CAR",
-    catchPack = "CATCH THE CAR AHEAD",
-    closeGap = "TOO FAR - CLOSE GAP",
-    passSafetyCar = "PASS SAFETY CAR - CATCH PACK",
-    noOvertake = "NO OVERTAKING",
-    test = "TEST",
-    off = ""
-}
-
--- Initialize variables
-local flagColor = rgbm.colors.gray
-local showFlags = false
-local goGreen = false
-local scOnTrack = false
-local rollingStart = false
-local scCleared = false
-local conditionsMet = false
-local getCarLapCounts = false
-local checkGoGreen = false
-local carLapCounts = {}
-local raceLeaderCar = nil
-local prevRaceLeaderCar = nil
-local leaderChangedLastBeat = false
-local driverCarSpeed = 0
-local rollingStartPenalties = {}
-
--- Text variables
-local speedLimit = 100
-local headFontSize = 22
-local fontsize = 28
-local helperFontsize = 16
-local scHeadingText = scHeadingTextState.sc
-local scHeadingTextBG = rgbm.colors.black
-local scHeadingTextColor = rgbm.colors.yellow
-local scTextColor = rgbm.colors.white
-local scHelperTextColor = rgbm.colors.red
-local scLeaderTextColor = rgbm.colors.orange
-local scStatusText = ""
-local scLeaderText = ""
-local scHelperText = ""
-
--- Timer variables
-local timeAccumulator = 0
-local checkStatesAccumulator = 0
-local posCheckAccumulator = 0
-local timeToDisplayTextAccumulator = 0
-local timeToDisplayGreenAccumulator = 0
-local leaderCheckTime = 0
-
--- Time duration variables
-local miniCheckInterval = 0.1
-local medCheckInterval = 0.3
-local checkStatesInterval = 60
-local timeToDisplaySCText = 2
-local timeToDisplayGreen = 5
+--####################################################################################################
+--####################################### AUDIO ######################################################
+--####################################################################################################
 
 -- Audio variables
 local scGoGreenAudio
@@ -120,133 +136,6 @@ local audioSCGoGreenEvent
 local audioSCInThisLapEvent
 local audioSCDeployedEvent
 
--- Window variables
-local flagWindowPos
-local flagWindowSize = vec2(300, 180)
-local defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
-local defaultFlagWindowPosY = (sim.windowHeight/4) - (flagWindowSize.y/2)
-
-if scFlagsValues.posVec2 == vec2(0.0) or nil then
-    scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-    flagWindowPos = scFlagsValues.posVec2
-else
-    flagWindowPos = scFlagsValues.posVec2
-end
-
--- Data storage for tracking the previous states of the text 
-local previousHelperTextState = ""
-local previousMinus1HelpertextState = ""
-local distanceThreshold = 16
-local distanceThresholdMultiplier = 2.5
-
-local function writeLog(message)
-    local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-    ac.log(timeStamp .. " | " .. version .." | " .. message) -- Also log to the default writeLog
-end
-
--- Get states from nill checks and late connections
-local function getStates()
-
-    sim = ac.getSim()
-    if sim then
-        currentSession = ac.getSession(sim.currentSessionIndex)
-    end
-    driverCar = ac.getCar(0)
-
-    safetyCar = nil
-    local safetyCarID = ac.getCarByDriverName(safetyCarName)
-    if safetyCarID then
-        writeLog("SC Flags: SC identified as:" .. safetyCarID)
-        safetyCar = ac.getCar(safetyCarID)
-    end
-
-    adminCars = {}
-    for i,v in ipairs(adminCarNames) do
-        local adminCarID = ac.getCarByDriverName(v)
-        if adminCarID then
-            table.insert(adminCars,adminCarID)
-        end
-    end
-
-    trackLength = sim.trackLengthM
-
-end
-
-local function reInitializeVars()
-    -- Initialize variables
-    flagColor = rgbm.colors.gray
-    showFlags = false
-    goGreen = false
-    scOnTrack = false
-    rollingStart = false
-    scCleared = false
-    conditionsMet = false
-    getCarLapCounts = false
-    checkGoGreen = false
-    carLapCounts = {}
-    raceLeaderCar = nil
-    prevRaceLeaderCar = nil
-    leaderChangedLastBeat = false
-    driverCarSpeed = 0
-    rollingStartPenalties = {}
-
-    -- Text variables
-    scHeadingText = scHeadingTextState.sc
-    scHeadingTextBG = rgbm.colors.black
-    scHeadingTextColor = rgbm.colors.yellow
-    scTextColor = rgbm.colors.white
-    scHelperTextColor = rgbm.colors.red
-    scLeaderTextColor = rgbm.colors.orange
-    scStatusText = ""
-    scLeaderText = ""
-    scHelperText = ""
-
-    --- Timer variables
-    timeAccumulator = 0
-    checkStatesAccumulator = 0
-    posCheckAccumulator = 0
-    timeToDisplayTextAccumulator = 0
-    timeToDisplayGreenAccumulator = 0
-    leaderCheckTime = 0
-
-    -- Window variables
-    flagWindowSize = vec2(300, 180)
-    defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
-    defaultFlagWindowPosY = (sim.windowHeight/7)
-    if scFlagsValues.posVec2 == vec2(0.0) or nil then
-        scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
-        flagWindowPos = scFlagsValues.posVec2
-    else
-        flagWindowPos = scFlagsValues.posVec2
-    end
-
-    -- Data storage for tracking the previous state of the text
-    previousHelperTextState = ""
-    previousMinus1HelpertextState = ""
-
-end
-
-local function repositionFlags()
-    flagWindowPos = scFlagsValues.posVec2
-end
-
-local function initializeSCFlagScript()
-    writeLog("SC Flags: Initialization starting")
-    getStates()
-    reInitializeVars()
-    writeLog("SC Flags: Initialization finished - sending notification messages.")
-    if (driverCar ==nil) then
-        writeLog("SC Flags: Initialization finished - Initialisation ERROR driverCar not identified!")
-        ac.sendChatMessage("SC: INFO | SC Flags Script " .. version .. " Initialisation ERROR driverCar not identified!")
-    elseif (safetyCar == nil) then
-        writeLog("SC Flags: Initialization finished - Initialisation ERROR safetyCar not identified!")
-        ac.sendChatMessage("SC: INFO | SC Flags Script " .. version .. " Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
-    else
-        writeLog("SC Flags: Initialization finished - Initialisation successful")
-        ac.sendChatMessage("SC: INFO | SC Flags Script " .. version .. " Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
-    end
-end
-
 -- Define the callback function
 local function logAudioCallback(err, folder)
 
@@ -255,12 +144,6 @@ local function logAudioCallback(err, folder)
     scInThisLapAudio = folder .. "/sc_safetycarinthislap.wav"
     scClearAudio = folder .. "/sc_safetycarisclear.wav"
     scGoGreenAudio = folder .. "/sc_greengreengreen.wav"
-
-    -- LOCAL FILES - NEW SOUNDS With Crewchief audio
-    --scDeployedAudio = "sc_safetycarisout.wav"
-    --scInThisLapAudio = "sc_safetycarinthislap.wav"
-    --scClearAudio = "sc_safetycarisclear.wav"
-    --scGoGreenAudio = "sc_greengreengreen.wav"
 
     scDeployedAudio = {
         filename = scDeployedAudio,
@@ -332,394 +215,33 @@ end
 -- Call web.loadRemoteAssets with the URL and the logging callback
 web.loadRemoteAssets("https://raw.githubusercontent.com/Jords03/vvs_sc/main/sc_wav_files_001.zip", logAudioCallback)
 
-local function setRollingStartConditions()
-    writeLog("SC Flags: Set Rolling Start Conditions")
-    flagColor = rgbm.colors.yellow
-    scTextColor = rgbm.colors.black
-    scHeadingTextColor = rgbm.colors.yellow
-    scStatusText = scState.rollingStart
-    scHeadingText = scHeadingTextState.sc
-    showFlags = true
-    rollingStart = true
-    scOnTrack = true
-    conditionsMet = false
-    scCleared = false
-    goGreen = false
-    writeLog("SC Flags: Set Rolling Start Conditions Done")
+
+--####################################################################################################
+--####################################### RENDERING FLAGS CODE #######################################
+--####################################################################################################
+
+-- Window variables
+local flagWindowPos
+local flagWindowSize = vec2(300, 180)
+local defaultFlagWindowPosX = (sim.windowWidth/2) - (flagWindowSize.x/2)
+local defaultFlagWindowPosY = (sim.windowHeight/4) - (flagWindowSize.y/2)
+
+-- Text variables
+local speedLimit = 100
+local headFontSize = 22
+local fontsize = 28
+local helperFontsize = 16
+local scHeadingTextBG = rgbm.colors.black
+local scHelperTextColor = rgbm.colors.red
+local scLeaderTextColor = rgbm.colors.orange
+
+
+if scFlagsValues.posVec2 == vec2(0.0) or nil then
+    scFlagsValues.posVec2 = vec2(defaultFlagWindowPosX, defaultFlagWindowPosY)
+    flagWindowPos = scFlagsValues.posVec2
+else
+    flagWindowPos = scFlagsValues.posVec2
 end
-
-local function scTestOn()
-    writeLog("SC Flags: Recieved - Test On")
-    flagColor = rgbm.colors.yellow
-    scTextColor = rgbm.colors.black
-    scHeadingTextColor = rgbm.colors.yellow
-    scStatusText = scState.test
-    scHeadingText = scHeadingTextState.test
-    conditionsMet = false
-    rollingStart = false
-    scCleared = false
-    showFlags = true
-    goGreen = false
-    scOnTrack = true
-    audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
-    audioSCDeployedEvent.volume = 5
-    audioSCDeployedEvent:start()
-    writeLog("SC Flags: Recieved - Test On Done")
-end
-
-local function scTestOff()
-    writeLog("SC Flags: Recieved - Test Off")
-    initializeSCFlagScript()
-    writeLog("SC Flags: Recieved - Test Off Done")
-end
-
-local function scDeployed()
-    writeLog("SC Flags: Recieved - Safety Car deployed")
-    flagColor = rgbm.colors.yellow
-    scTextColor = rgbm.colors.black
-    scHeadingTextColor = rgbm.colors.yellow
-    scStatusText = scState.deployed
-    scHeadingText = scHeadingTextState.sc
-    conditionsMet = false
-    rollingStart = false
-    scCleared = false
-    showFlags = true
-    goGreen = false
-    scOnTrack = true
-    audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
-    audioSCDeployedEvent.volume = 5
-    audioSCDeployedEvent:start()
-    writeLog("SC Flags: Recieved - Safety Car deployed Done")
-end
-
-local function scInThisLap()
-    writeLog("SC Flags: Recieved - Safety Car in this lap")
-    flagColor = rgbm(0.6, 0.6, 0, 1)
-    scStatusText = scState.returning
-    scTextColor = rgbm.colors.black
-    scLeaderText = scLeaderTextState.maintain
-    scCleared = false
-    conditionsMet = true
-    getCarLapCounts = true
-    showFlags = true
-    goGreen = false
-    scOnTrack = true
-    audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
-    audioSCInThisLapEvent.volume = 5
-    audioSCInThisLapEvent:start()
-    timeToDisplayTextAccumulator = timeAccumulator
-    writeLog("SC Flags: Recieved - Safety Car in this lap Done")
-end
-
-local function scIsClear()
-    writeLog("SC Flags: Recieved - Safety Car is clear")
-    flagColor = rgbm(0.4, 0.4, 0.4, 1)
-    scStatusText = scState.enteringPit
-    scTextColor = rgbm.colors.yellow
-    scLeaderText = scLeaderTextState.goAnyTime
-    scHelperText = scHelperTextState.noOvertake
-    showFlags = true
-    scCleared = true
-    scOnTrack = false
-    checkGoGreen = true
-    goGreen = false
-    audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
-    audioSCClearEvent.volume = 5
-    audioSCClearEvent:start()
-    timeToDisplayTextAccumulator = timeAccumulator
-    writeLog("SC Flags: Recieved - Safety Car is clear Done")
-end
-
---utility function to check if a table contains a value
-local function tableContains(testTable, value)
-    for i = 1,#testTable do
-      if (testTable[i] == value) then
-        return true
-      end
-    end
-    return false
-  end
-
---chat message processing  
-ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
-    if string.startsWith(message, "SC") then
-        if not safetyCar then
-            getStates()
-        end
-        if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
-            writeLog("SC Flags: chatmsg: " .. message)
-
-            if message == "SC: Safety Car rolling start" then
-                writeLog("SC Flags: Recieved - Safety Car rolling start")
-                setRollingStartConditions()
-            elseif message == "SC: Safety Car deployed" then
-                scDeployed()
-            elseif message == "SC: Safety Car in this lap" then
-                scInThisLap()
-            elseif message == "SC: Safety Car is clear" then
-                scIsClear()
-            elseif message == "SC: Safety Car has reset in pits" then
-                writeLog("SC Flags: Recieved - Safety Car has reset in pits")
-                --flagColor = rgbm.colors.gray
-                --showFlags = true
-                --UNUSED
-            elseif string.startsWith(message, "SC: Go Green") then
-                writeLog("SC Flags: Recieved - Go Green")
-                -- Unused -> we track leader on client side for accuracy
-            elseif message == "SC kill" then
-                --initializeSCFlagScript()
-                writeLog("SC Flags: Recieved - SC kill")
-                --treat this like the SC has gone in
-                scInThisLap()
-                scIsClear()
-            elseif message == "SC kf" then 
-                writeLog("SC Flags: Recieved - SC kf")
-                initializeSCFlagScript()
-            elseif message == "SC: Test On" then
-                scTestOn()
-            elseif message == "SC: Test Off" then
-                scTestOff()
-            end
-
-            
-        end
-    end
-    if string.startsWith(message, "SC: INFO") then
-        table.insert(rollingStartPenalties, message)
-
-        writeLog("SC Flags: Info message: " .. message)
-    end
-    return true
-end)
-
---XXX 
--- ################################################################
--- SINGLE PLAYER TESTING WITH LIMITED AI CAR CONTROL
--- Set the field to use slower cars than SC and try have SC at front
--- Requires track surfaces.ini to have extended physics entry for apps
--- [_SCRIPTING_PHYSICS]
--- ALLOW_APPS = 1 ; Allow Lua apps to access physics API
---[[ 
-local btnSCRoll = ac.ControlButton('app.sc_flags/scroll', ui.KeyIndex.R)
-btnSCRoll:onPressed(function()
-    writeLog("SC: Recieved - Safety Car rolling start")
-    setRollingStartConditions()
-    for i, car in ac.iterateCars.ordered() do
-        if car ~= driverCar then
-            physics.setAIThrottleLimit(car.index, 0.5)
-            physics.setAITopSpeed(car.index, 100)
-            physics.setAIAggression(car.index, 0.6)
-            physics.setAISplineAbsoluteOffset(car.index, 0, true)
-        end
-    end
-end)
-
-local btnSCOn = ac.ControlButton('app.sc_flags/scon', ui.KeyIndex.A)
-btnSCOn:onPressed(function()
-    scDeployed()
-    for i, car in ac.iterateCars.ordered() do
-        if car ~= driverCar then
-            physics.setAICaution(car.index, 10)
-            physics.setAIThrottleLimit(car.index, 0.5)
-            physics.setAITopSpeed(car.index, 100)
-            physics.setAIAggression(car.index, 0.6)
-            physics.setAISplineAbsoluteOffset(car.index, 0, true)
-        end
-    end
-end)
-
-local btnSCPits = ac.ControlButton('app.sc_flags/scpits', ui.KeyIndex.S)
-btnSCPits:onPressed(function()
-    scInThisLap()
-    for i, car in ac.iterateCars.ordered() do
-        if car ~= driverCar then
-            physics.setAICaution(car.index, 5)
-            physics.setAIThrottleLimit(car.index, 0.5)
-            physics.setAITopSpeed(car.index, 100)
-            physics.setAIAggression(car.index, 0.6)
-        end
-        if car == safetyCar then
-            physics.setAIPitStopRequest(car.index, true)
-            physics.setAITopSpeed(car.index, 120)
-            physics.setAILookaheadGasBrake(car.index, 15)
-        end
-    end
-end)
-
-local btnSCOff = ac.ControlButton('app.sc_flags/scoff', ui.KeyIndex.D)
-btnSCOff:onPressed(function()
-    scIsClear()
-    if rollingStart then
-        for i, car in ac.iterateCars.ordered() do
-            if car ~= driverCar then
-                physics.setAIThrottleLimit(car.index, 1)
-                physics.setAITopSpeed(car.index, 100)
-                physics.setAIAggression(car.index, 0.9)
-                physics.setAISplineOffset(car.index, 0, false)
-            end
-        end
-    else
-        for i, car in ac.iterateCars.ordered() do
-            if car ~= driverCar then
-                --physics.setCarAutopilot(true, false)
-                physics.setAIThrottleLimit(car.index, 1)
-                physics.setAITopSpeed(car.index, 100)
-                physics.setAIAggression(car.index, 0.9)
-                physics.setAISplineOffset(car.index, 0, false)
-            end
-            if car == safetyCar then
-                --physics.setAINoInput(car.index, true, false)
-                physics.setAITopSpeed(car.index, 10)
-            end
-        end
-    end
-end)
- ]]
--- ################################################################
-
--- Calculate the normalized distance behind the safety car
-local function calculateDistanceTo(carPosition, otherPosition)
-    if carPosition > otherPosition then
-        otherPosition = otherPosition + 1
-    end
-    return otherPosition - carPosition  -- Always a value between 0 and 1
-end
-
--- Function to check distance and position
-local function checkPos(dt)
-
-    local car = driverCar
-    if not car then return end
-
-    driverCarSpeed = math.floor(car.speedKmh * 10) / 10
-
-    local carAhead = nil
-    local tooFar = false
-    local catchSC = false
-    local passSafetyCar = false
-    local distanceToSC = 0
-    local carDistance = 0
-
-    -- Calculate the distance behind the safety car
-    local distanceBehindSC = calculateDistanceTo(car.splinePosition, safetyCar.splinePosition)
-    distanceToSC = distanceBehindSC * trackLength --for debugging only
-
-    -- Find the next car ahead on track
-    local minDistanceAhead = 1  -- Initialize with maximum possible spline position difference
-    for i, otherCar in ac.iterateCars.ordered() do
-        if otherCar ~= safetyCar and otherCar ~= car and otherCar.isConnected and not (otherCar.isInPitlane or otherCar.isInPit) then
-            local distanceAhead = calculateDistanceTo(car.splinePosition, otherCar.splinePosition)
-            if distanceAhead > 0 and distanceAhead < minDistanceAhead then
-                minDistanceAhead = distanceAhead
-                carAhead = otherCar
-            end
-        end
-    end
-
-    --writeLog("Car ahead is: " .. carAhead:driverName() .. " and is " .. minDistanceAhead * trackLength .. " ahead")
-
-    -- if leader then car ahead is the safety car
-    if car == raceLeaderCar then
-        carAhead = safetyCar
-        minDistanceAhead = distanceBehindSC
-    elseif raceLeaderCar ~= nil then
-        local distanceBehindLeader = calculateDistanceTo(car.splinePosition, raceLeaderCar.splinePosition)
-        local betweenLeaderAndSafetyCar = (distanceBehindLeader >= distanceBehindSC)
-        if betweenLeaderAndSafetyCar then
-            passSafetyCar = true
-        end
-    end
-    -- Calculate the distance to the car ahead
-    if carAhead then
-        carDistance = minDistanceAhead * trackLength
-        --ac.debug("SC Flags: minDistanceAhead", minDistanceAhead)
-        tooFar = carDistance > distanceThreshold
-
-        if (carDistance > (distanceThreshold * distanceThresholdMultiplier)) then
-            catchSC = true
-        end
-    end
-
-    -- Prioritize conditions
-    local newHelperTextState = scHelperTextState.noOvertake
-
-    if car == raceLeaderCar then
-        scLeaderText = scLeaderTextState.leader
-    end
-
-    if scCleared then
-        newHelperTextState = scHelperTextState.noOvertake
-    elseif passSafetyCar then
-        newHelperTextState = scHelperTextState.passSafetyCar
-    elseif catchSC and scStatusText ~= scState.returning then
-        if car == raceLeaderCar then
-            newHelperTextState = scHelperTextState.catchSC .. " - " .. math.floor(carDistance) .. "m"
-        else
-            newHelperTextState = scHelperTextState.catchPack .. " - " .. math.floor(carDistance) .. "m"
-        end
-    elseif tooFar then
-        newHelperTextState = scHelperTextState.closeGap .. " - " .. math.floor(carDistance) .. "m"
-    end
-
-    if newHelperTextState ~= previousHelperTextState then
-        writeLog("SC Flags: helper text state change from " .. previousHelperTextState .. " to " .. newHelperTextState)
-        if car == raceLeaderCar and scStatusText == scState.returning then
-            -- Replaced with UI elements
-            --scLeaderText = scLeaderTextState.maintain
-            --scHelperText = math.floor(car.speedKmh) .. " km/h"
-            scLeaderText = scLeaderTextState.off
-            scHelperText = scHelperTextState.off
-            previousHelperTextState = newHelperTextState
-        elseif car == raceLeaderCar and scStatusText == scState.enteringPit then
-            scLeaderText = scLeaderTextState.goAnyTime
-        else
-            -- sanitise pass and closegap messages - if we are switching to one of these, then wait a beat and only do it if we still have the same outcome
-            if previousMinus1HelpertextState == "" then
-                --prev minus 1 is nil so this is the first beat that we changed, if this is one that we need to sanitise then just store it
-                if newHelperTextState == scHelperTextState.catchSC or newHelperTextState == scHelperTextState.closeGap or newHelperTextState == scHelperTextState.catchPack  then
-                    previousMinus1HelpertextState = newHelperTextState
-                else
-                    --it isn't one we care about sanitising to just store prev and set this one
-                    previousHelperTextState = newHelperTextState
-                    scHelperText = newHelperTextState
-                    --writeLog("dont care: " .. scHelperText)
-                end
-            else -- prev minus 1 is not nil so this is a second beat to check
-                --sanity check that we have the same result on next beat
-                if previousMinus1HelpertextState == newHelperTextState then
-                    --we do so set the values and continue
-                    scHelperText = newHelperTextState
-                    --writeLog("do care: " .. scHelperText)
-                    previousMinus1HelpertextState = ""
-                    previousHelperTextState = newHelperTextState
-                else
-                    --sanity check failed, this is a different condition than last time - just reset the prev minus 1 check
-                    previousMinus1HelpertextState = ""
-                end
-            end
-        end
-    end
-
-    --ac.debug("SC Flags: Inside Pos Check", dt)
-    --ac.debug("SC Flags: Inside Pos Check catchSC", catchSC)
-
-    -- Debugging output
-    --[[ ac.debug("SC Flags: newHelperTextState", newHelperTextState)
-    ac.debug("SC Flags: previousHelperTextState", previousHelperTextState)
-    ac.debug("SC Flags: DT", dt)
-    ac.debug("SC Flags: 1-Driver", car:driverName())
-    if raceLeaderCar then
-        ac.debug("SC Flags: 2-RaceLeaderCar", raceLeaderCar:driverName())
-    end
-    ac.debug("SC Flags: 3-distanceToSC", distanceToSC)
-    ac.debug("SC Flags: 4-carDistance", carDistance)
-    ac.debug("SC Flags: catchSC", catchSC)
-    ac.debug("SC Flags: tooFar", tooFar)
-    ac.debug("SC Flags: prevState", true)
-    ac.debug("SC Flags: showFlags", showFlags) ]]
-    
-end
-
 
 local function textSize(text_size, fontsize)
     local calcTextSize = ui.measureDWriteText(text_size, fontsize)
@@ -727,9 +249,10 @@ local function textSize(text_size, fontsize)
 end
 
 local function uiFlags(dt)
-    if showFlags or scFlagsValues.settingsOpen or debug then       
+    --draw the flags, but only if the flagsStatus is not inactive (or we are repositioning the flags window)
+    if (driverCar ~= safetyCar and scFlagsState.status ~= "inactive") or scFlagsValues.settingsOpen then
 
-        ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)        
+        ui.beginTransparentWindow("SC Flags", flagWindowPos, flagWindowSize, true, false)   
 
         local sectionGridAvailableSpaceY = ui.availableSpaceY() / 4
         
@@ -745,10 +268,10 @@ local function uiFlags(dt)
         local scFlagBoxCenter = scFlagBoxStart + (scFlagBoxSize / 2)
         local scHelperTextCenter = vec2(ui.availableSpaceX()/2, (sectionGridAvailableSpaceY*3)+(sectionGridAvailableSpaceY/3))
 
-        local scHeadingTextSize = textSize(scHeadingText, headFontSize)
-        local scStatusTextSize = textSize(scStatusText, fontsize)
-        local scLeaderTextSize = textSize(scLeaderText, helperFontsize)
-        local scHelperTextSize = textSize(scHelperText, helperFontsize)
+        local scHeadingTextSize = textSize(scFlagsState.headingText, headFontSize)
+        local scStatusTextSize = textSize(scFlagsState.statusText, fontsize)
+        local scLeaderTextSize = textSize(scFlagsState.leaderText, helperFontsize)
+        local scHelperTextSize = textSize(scFlagsState.helperText, helperFontsize)
 
         local scHeadingTextStart = scHeadingRectCenter - (scHeadingTextSize / 2)
         local scStatusTextStart = scFlagBoxCenter - (scStatusTextSize / 2)
@@ -756,126 +279,113 @@ local function uiFlags(dt)
         local scHelperTextStart = scHelperTextCenter - (scHelperTextSize / 2)
         ui.pushDWriteFont("RealPenalty")
 
-        if (not rollingStart or not conditionsMet)
-        and (not (driverCar == raceLeaderCar and conditionsMet) or scCleared)
-        or goGreen
-        or debug
-        then
+        --there are 2 states for the flags box - the normal one, and the one with the speed limit display
+        --the speed limit display is shown for the leader when the SC is coming in after deployment
+        --and is shown for everyone if the sc is coming in after a rolling start
+        if not (scFlagsState.status == "rollingComingIn" or (scFlagsState.status == "rollingComingIn" and driverCar == raceLeaderCar)) then
             --Draw main flag box for everyone
-            
             ui.drawRectFilled(scHeadingTextBoxStart, scHeadingTextBoxEnd, scHeadingTextBG, 5, ui.CornerFlags.Top)
-            ui.dwriteDrawText(scHeadingText, headFontSize, scHeadingTextStart, scHeadingTextColor)
+            ui.dwriteDrawText(scFlagsState.headingText, headFontSize, scHeadingTextStart, scFlagsState.headingTextColor)
 
-            ui.drawRectFilled(scFlagBoxStart, scFlagBoxEnd, flagColor, 5, ui.CornerFlags.Bottom)
-            ui.dwriteDrawText(scStatusText, fontsize, scStatusTextStart, scTextColor)
+            ui.drawRectFilled(scFlagBoxStart, scFlagBoxEnd, scFlagsState.flagColor, 5, ui.CornerFlags.Bottom)
+            ui.dwriteDrawText(scFlagsState.statusText, fontsize, scStatusTextStart, scFlagsState.statusTextColor)
 
-            --if driverCar ~= safetyCar and sim.sessionTimeLeft < 0 then
-            if driverCar ~= safetyCar and sim.timeToSessionStart < 0 then
-                if driverCar == raceLeaderCar
-                and (not rollingStart or (not conditionsMet or scCleared))
-                or debug
-                then
-                    -- Leader only text
-                    ui.dwriteDrawText(scLeaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
+            if sim.timeToSessionStart < 0 then
+                if driverCar == raceLeaderCar then
+                    -- Leader gets an additional text line
+                    ui.dwriteDrawText(scFlagsState.leaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
                     scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
                 end
-                if not (driverCar == raceLeaderCar and (scCleared or conditionsMet)) then
+                if true then
                     -- All driver helper text
-                    ui.dwriteDrawText(scHelperText, helperFontsize, scHelperTextStart, scHelperTextColor)
+                    ui.dwriteDrawText(scFlagsState.helperText, helperFontsize, scHelperTextStart, scHelperTextColor)
                 end
             end
-        end        
+        --Speed limit display
+        else
 
-        if driverCar ~= safetyCar then
-            if (rollingStart and conditionsMet)
-            or (conditionsMet and driverCar == raceLeaderCar and not scCleared)
-            or debug
-            then
-                ac.debug("SC Flags: Inside Rolling Start", scStatusText)
-                local speedLimitSignSize = 40
-                local speedLimitSignBorder = 12
-                local speedLimitTotalWidth = speedLimitSignSize*2 + speedLimitSignBorder
-                local speedSignXOffset = 250
-                local speedSignYOffset = 25
-                local speedLimitSignStart = vec2(speedLimitSignSize + speedLimitSignBorder / 2, speedLimitSignSize + speedLimitSignBorder / 2)
-                speedLimitSignStart.x = speedLimitSignStart.x + flagWindowPos.x
-                local speedLimitSignBoxSize = speedLimitSignStart * 2 + vec2(speedLimitSignBorder / 2, speedLimitSignBorder / 2)
-                local speedLimitSignPosLeft = vec2(scFlagBoxCenter.x-speedSignXOffset-speedLimitTotalWidth/2, flagWindowPos.y + speedSignYOffset)
-                local speedLimitSignPosRight = vec2(scFlagBoxCenter.x+speedSignXOffset-speedLimitTotalWidth/2, flagWindowPos.y + speedSignYOffset)
-                local speedLimitFontSize = 32
-                local speedLimitText = tostring(speedLimit)
+            local speedLimitSignSize = 40
+            local speedLimitSignBorder = 12
+            local speedLimitTotalWidth = speedLimitSignSize*2 + speedLimitSignBorder
+            local speedSignXOffset = 250
+            local speedSignYOffset = 25
+            local speedLimitSignStart = vec2(speedLimitSignSize + speedLimitSignBorder / 2, speedLimitSignSize + speedLimitSignBorder / 2)
+            speedLimitSignStart.x = speedLimitSignStart.x + flagWindowPos.x
+            local speedLimitSignBoxSize = speedLimitSignStart * 2 + vec2(speedLimitSignBorder / 2, speedLimitSignBorder / 2)
+            local speedLimitSignPosLeft = vec2(scFlagBoxCenter.x-speedSignXOffset-speedLimitTotalWidth/2, flagWindowPos.y + speedSignYOffset)
+            local speedLimitSignPosRight = vec2(scFlagBoxCenter.x+speedSignXOffset-speedLimitTotalWidth/2, flagWindowPos.y + speedSignYOffset)
+            local speedLimitFontSize = 32
+            local speedLimitText = tostring(speedLimit)
 
-                ui.beginTransparentWindow("SC Flags SpeedLimit Left", speedLimitSignPosLeft, speedLimitSignBoxSize, true, false)
-                ui.drawCircle(speedLimitSignStart, speedLimitSignSize, rgbm(1, 0, 0, 1), 48, 12)
-                ui.drawCircleFilled(speedLimitSignStart, speedLimitSignSize, rgbm(1, 1, 1, 1), 48)
-                ui.dwriteTextAligned(speedLimitText, speedLimitFontSize, ui.Alignment.Center, ui.Alignment.Center, speedLimitSignBoxSize, false, rgbm(0, 0, 0, 1))
-                ui.endTransparentWindow()
+            ui.beginTransparentWindow("SC Flags SpeedLimit Left", speedLimitSignPosLeft, speedLimitSignBoxSize, true, false)
+            ui.drawCircle(speedLimitSignStart, speedLimitSignSize, rgbm(1, 0, 0, 1), 48, 12)
+            ui.drawCircleFilled(speedLimitSignStart, speedLimitSignSize, rgbm(1, 1, 1, 1), 48)
+            ui.dwriteTextAligned(speedLimitText, speedLimitFontSize, ui.Alignment.Center, ui.Alignment.Center, speedLimitSignBoxSize, false, rgbm(0, 0, 0, 1))
+            ui.endTransparentWindow()
 
-                ui.beginTransparentWindow("SC Flags SpeedLimit Right", speedLimitSignPosRight, speedLimitSignBoxSize, true, false)
-                ui.drawCircle(speedLimitSignStart, speedLimitSignSize, rgbm(1, 0, 0, 1), 48, 12)
-                ui.drawCircleFilled(speedLimitSignStart, speedLimitSignSize, rgbm(1, 1, 1, 1), 48)
-                ui.dwriteTextAligned(speedLimitText, speedLimitFontSize, ui.Alignment.Center, ui.Alignment.Center, speedLimitSignBoxSize, false, rgbm(0, 0, 0, 1))
-                ui.endTransparentWindow()
+            ui.beginTransparentWindow("SC Flags SpeedLimit Right", speedLimitSignPosRight, speedLimitSignBoxSize, true, false)
+            ui.drawCircle(speedLimitSignStart, speedLimitSignSize, rgbm(1, 0, 0, 1), 48, 12)
+            ui.drawCircleFilled(speedLimitSignStart, speedLimitSignSize, rgbm(1, 1, 1, 1), 48)
+            ui.dwriteTextAligned(speedLimitText, speedLimitFontSize, ui.Alignment.Center, ui.Alignment.Center, speedLimitSignBoxSize, false, rgbm(0, 0, 0, 1))
+            ui.endTransparentWindow()
 
-                -- ### SPEED INDICATOR ###
-                --local carSpeed = math.floor(driverCar.speedKmh * 10) / 10
-                local carSpeed = driverCarSpeed
-
-                --local speedIndicatorPos = vec2(flagWindowPos.x, flagWindowPos.y+flagWindowSize.y+10)
-                local speedIndicatorPos = vec2(flagWindowPos.x, flagWindowPos.y + speedSignYOffset)
-                local speedIndicatorBarHeight = 26
-                local speedIndicatorValueHeight = 32
-                local speedIndicatorValueGap = 6
-                local speedIndicatorValueYOffset = 63
-                local speedIndicatorBoxSize = vec2(flagWindowSize.x, speedIndicatorBarHeight * 2 + speedIndicatorValueGap + speedIndicatorValueHeight) -- * number of rects
-                ui.beginTransparentWindow("SC Flags Speed Indicator", speedIndicatorPos, speedIndicatorBoxSize, true, false)
-
-                local speedIndicatorFontSize = 22
-                local speedHelperFontSize = 18
-                local speedRatio = speedIndicatorBoxSize.x / speedLimit
-                local speedIndicatorValue = carSpeed * speedRatio
-                --local speedIndicatorEnd = vec2(speedIndicatorValue, speedIndicatorBarHeight * 2 + speedIndicatorValueHeight)
-                local speedIndicatorEnd = vec2(speedIndicatorValue, speedIndicatorBoxSize.y)
-                local isOverLimit = carSpeed > speedLimit
-                local speedToString = tostring(carSpeed)
-                local rectColor = isOverLimit and rgbm(0.8, 0, 0, 1) or rgbm(0, 0.8, 0, 1)
-                local speedHelperText = scLeaderTextState.watch
-                if rollingStart then
-                    speedHelperText = scRollingTextState.ending
-                end
-
-                ui.drawRectFilled( vec2(0, 0), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight), rgbm(0.8, 0.8, 0, 1), 0, ui.CornerFlags.None )
-                ui.dwriteTextAligned( speedHelperText, speedHelperFontSize, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-2), false, rgbm(0, 0, 0, 1))
-                
-                ui.drawRectFilled( vec2(0, speedIndicatorBarHeight), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight*2), rgbm(0.15, 0.15, 0.3, 1), 0, ui.CornerFlags.None )
-                ui.dwriteTextAligned( scRollingTextState.maintain, speedHelperFontSize-2, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-10), false, rgbm(0.7, 0.7, 0.7, 1))
-                
-                ui.drawRectFilled( vec2(0, speedIndicatorBarHeight*2 + speedIndicatorValueGap), speedIndicatorEnd, rectColor, 0, ui.CornerFlags.None )
-                --ui.drawRectFilled( vec2(0, speedIndicatorBoxSize.y), vec2(speedIndicatorBoxSize.x, speedIndicatorBoxSize.y/2), rectColor, 0, ui.CornerFlags.None )
-                ui.dwriteDrawText(speedToString, speedIndicatorFontSize, vec2(20, speedIndicatorValueYOffset), rgbm(0, 0, 0, 1))
-                --ui.dwriteTextAligned( speedToString, speedIndicatorFontSize, ui.Alignment.Start, ui.Alignment.Center, vec2(60, speedIndicatorBoxSize.y/3), false, rgbm(0, 0, 0, 1))
-                --ui.dwriteDrawText("KMH", speedIndicatorFontSize, vec2(64, 41), rgbm(0, 0, 0, 1))
-                if isOverLimit or debug then
-                    ui.dwriteDrawText("TOO FAST!", speedIndicatorFontSize, vec2(flagWindowSize.x/2+10, speedIndicatorValueYOffset), rgbm(0, 0, 0, 1))
-                end
-                ui.endTransparentWindow()
+            -- ### SPEED INDICATOR ###
+            local carSpeed = 1
+            if driverCar == nil then
+                writeLog("ERROR: Rendering flags and driver car is nil!!")
+                -- try and get it again
+                driverCar = ac.getCar(0)
+                return
+            else
+                carSpeed = math.floor(driverCar.speedKmh * 10) / 10
             end
+        
+            local speedIndicatorPos = vec2(flagWindowPos.x, flagWindowPos.y + speedSignYOffset)
+            local speedIndicatorBarHeight = 26
+            local speedIndicatorValueHeight = 32
+            local speedIndicatorValueGap = 6
+            local speedIndicatorValueYOffset = 63
+            local speedIndicatorBoxSize = vec2(flagWindowSize.x, speedIndicatorBarHeight * 2 + speedIndicatorValueGap + speedIndicatorValueHeight) -- * number of rects
+            ui.beginTransparentWindow("SC Flags Speed Indicator", speedIndicatorPos, speedIndicatorBoxSize, true, false)
 
-            --TODO: unfinished
-            -- Penalties Display
-            --[[ local penaltyStartPos = vec2(flagWindowPos.x + 700, flagWindowPos.y)
-            local penaltyBoxSize = vec2(300, 300)
-            local penaltyFontSize = 16
-            local lineSpacing = 15
-            ui.pushDWriteFont("RealPenalty")
-            ui.beginTransparentWindow("SC Flags Penalties", penaltyStartPos, penaltyBoxSize, true, false)
-            for i, penaltyMessage in ipairs(rollingStartPenalties) do
-                local posOffset = vec2(0, (i - 1) * lineSpacing) -- Calculate position for each line
-                ui.dwriteDrawText(penaltyMessage, penaltyFontSize, posOffset, rgbm(1, 0, 0, 1)) -- Display penalty in red color
+            local speedIndicatorFontSize = 22
+            local speedHelperFontSize = 18
+            local speedRatio = speedIndicatorBoxSize.x / speedLimit
+            local speedIndicatorValue = carSpeed * speedRatio
+            local speedIndicatorEnd = vec2(speedIndicatorValue, speedIndicatorBoxSize.y)
+            local isOverLimit = carSpeed > speedLimit
+            local rectColor = isOverLimit and rgbm(0.8, 0, 0, 1) or rgbm(0, 0.8, 0, 1)
+
+            ui.drawRectFilled( vec2(0, 0), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight), rgbm(0.8, 0.8, 0, 1), 0, ui.CornerFlags.None )
+            ui.dwriteTextAligned( scFlagsState.statusText, speedHelperFontSize, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-2), false, rgbm(0, 0, 0, 1))
+            
+            ui.drawRectFilled( vec2(0, speedIndicatorBarHeight), vec2(speedIndicatorBoxSize.x, speedIndicatorBarHeight*2), rgbm(0.15, 0.15, 0.3, 1), 0, ui.CornerFlags.None )
+            ui.dwriteTextAligned( scFlagsState.speedText, speedHelperFontSize-2, ui.Alignment.Center, ui.Alignment.End, vec2(ui.availableSpaceX(), speedIndicatorBarHeight-10), false, rgbm(0.7, 0.7, 0.7, 1))
+            
+            ui.drawRectFilled( vec2(0, speedIndicatorBarHeight*2 + speedIndicatorValueGap), speedIndicatorEnd, rectColor, 0, ui.CornerFlags.None )
+            ui.dwriteDrawText(tostring(carSpeed), speedIndicatorFontSize, vec2(20, speedIndicatorValueYOffset), rgbm(0, 0, 0, 1))
+
+            if isOverLimit then
+                ui.dwriteDrawText("TOO FAST!", speedIndicatorFontSize, vec2(flagWindowSize.x/2+10, speedIndicatorValueYOffset), rgbm(0, 0, 0, 1))
             end
-            ui.endTransparentWindow() ]]
-            -- Penalties Display End
+            ui.endTransparentWindow()
         end
+
+        --TODO: unfinished
+        -- Penalties Display
+        --[[ local penaltyStartPos = vec2(flagWindowPos.x + 700, flagWindowPos.y)
+        local penaltyBoxSize = vec2(300, 300)
+        local penaltyFontSize = 16
+        local lineSpacing = 15
+        ui.pushDWriteFont("RealPenalty")
+        ui.beginTransparentWindow("SC Flags Penalties", penaltyStartPos, penaltyBoxSize, true, false)
+        for i, penaltyMessage in ipairs(rollingStartPenalties) do
+            local posOffset = vec2(0, (i - 1) * lineSpacing) -- Calculate position for each line
+            ui.dwriteDrawText(penaltyMessage, penaltyFontSize, posOffset, rgbm(1, 0, 0, 1)) -- Display penalty in red color
+        end
+        ui.endTransparentWindow() ]]
+
+        -- Penalties Display End
         ui.endTransparentWindow()
     end
 end
@@ -884,263 +394,527 @@ function script.drawUI()
     uiFlags()
 end
 
+--####################################################################################################
+--############################# STATE TRANSITION UTILITY FUNCTIONS ###################################
+--####################################################################################################
+
+--for rolling starts it will go: inactive -> rolling -> rollingComingIn -> green -> inactive
+--for normal SC callouts it will go: inactive -> deployed -> comingIn -> clear -> green -> inactive
+
+local function scRollingStart()
+    writeLog("State transition from " .. scFlagsState.status .. " to rolling")
+
+    scFlagsState = {
+        status = "rolling",
+        headingText = "SAFETY CAR", --shown at the very top of the normal flag box
+        headingTextColor = rgbm.colors.yellow, -- heading text colour
+        statusText = "ROLLING START", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.black, -- status text colour
+        speedText = "", --only shown on the coming in box, in the middle
+        helperText = "NO OVERTAKING", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "YOU ARE RACE LEADER", --Special sub text for the leader
+        flagColor = rgbm.colors.yellow -- flag colour   
+    }
+
+end
+
+local function scDeployed()
+
+    writeLog("State transition from " .. scFlagsState.status .. " to deployed")
+
+    scFlagsState = {
+        status = "deployed",
+        headingText = "SAFETY CAR", --shown at the very top of the normal flag box
+        headingTextColor = rgbm.colors.yellow, -- heading text colour
+        statusText = "DEPLOYED", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.black, -- status text colour
+        speedText = "", --only shown on the coming in box, in the middle
+        helperText = "NO OVERTAKING", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "YOU ARE RACE LEADER", --Special sub text for the leader
+        flagColor = rgbm.colors.yellow -- flag colour   
+    }
+
+    audioSCDeployedEvent = ac.AudioEvent.fromFile(scDeployedAudio, false)
+    audioSCDeployedEvent.volume = 5
+    audioSCDeployedEvent:start()
+
+end
+
+local function scRollingComingIn()
+    writeLog("State transition from " .. scFlagsState.status .. " to rollingComingIn")
+
+    scFlagsState = {
+        status = "rollingComingIn",
+        headingText = "SAFETY CAR", --shown at the very top of the normal flag box
+        headingTextColor = rgbm.colors.yellow, -- heading text colour
+        statusText = "ENDING", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.black, -- status text colour
+        speedText = "MAINTAIN YOUR SPEED", --only shown on the coming in box, in the middle
+        helperText = "NO OVERTAKING", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "", --Special sub text for the leader
+        flagColor = rgbm(0.6, 0.6, 0, 1) -- flag colour   
+    }
+
+    audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
+    audioSCInThisLapEvent.volume = 5
+    audioSCInThisLapEvent:start()
+
+end
+
+local function scInThisLap()
+    writeLog("State transition from " .. scFlagsState.status .. " to comingIn")
+
+    scFlagsState = {
+        status = "comingIn",
+        headingText = "SAFETY CAR", --shown at the very top of the normal flag box
+        headingTextColor = rgbm.colors.yellow, -- heading text colour
+        statusText = "ENDING", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.black, -- status text colour
+        speedText = "MAINTAIN YOUR SPEED", --only shown on the coming in box, in the middle
+        helperText = "NO OVERTAKING", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "", --Special sub text for the leader
+        flagColor = rgbm(0.6, 0.6, 0, 1) -- flag colour   
+    }
+
+    audioSCInThisLapEvent = ac.AudioEvent.fromFile(scInThisLapAudio, false)
+    audioSCInThisLapEvent.volume = 5
+    audioSCInThisLapEvent:start()
+
+    writeLog("Set Safety Car in this lap Done")
+end
+
+local function scIsClear()
+    writeLog("State transition from " .. scFlagsState.status .. " to clear")
+
+    scFlagsState = {
+        status = "clear",
+        headingText = "SAFETY CAR", --shown at the very top of the normal flag box
+        headingTextColor = rgbm.colors.yellow, -- heading text colour
+        statusText = "CLEAR", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.yellow, -- status text colour
+        speedText = "", --only shown on the coming in box, in the middle
+        helperText = "NO OVERTAKING", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "GO AT ANY TIME", --Special sub text for the leader
+        flagColor = rgbm(0.4, 0.4, 0.4, 1) -- flag colour   
+    }
+
+    audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
+    audioSCClearEvent.volume = 5
+    audioSCClearEvent:start()
+
+    writeLog("Set Safety Car is clear Done")
+end
+
+local function scGoGreen()
+    writeLog("State transition from " .. scFlagsState.status .. " to green")
+
+    scFlagsState = {
+        status = "green",
+        headingText = "GREEN FLAG", --shown at the very top of the normal flag box
+        headingTextColor = rgbm(0,225,0,1), -- heading text colour
+        statusText = "", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.yellow, -- status text colour
+        speedText = "", --only shown on the coming in box, in the middle
+        helperText = "", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "", --Special sub text for the leader
+        flagColor = rgbm(0,225,0,1) -- flag colour   
+    }
+
+    audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
+    audioSCGoGreenEvent.volume = 5
+    audioSCGoGreenEvent:start()
+
+    goGreenTimer = timeAccumulator
+
+end
+
+local function scInactive()
+    writeLog("State transition from " .. scFlagsState.status .. " to inactive")
+
+    scFlagsState = {
+        status = "inactive",
+        headingText = "", --shown at the very top of the normal flag box
+        headingTextColor = rgbm.colors.black, -- heading text colour
+        statusText = "", --Main display text / top line of the coming in box
+        statusTextColor = rgbm.colors.black, -- status text colour
+        speedText = "", --only shown on the coming in box, in the middle
+        helperText = "", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        leaderText = "", --Special sub text for the leader
+        flagColor = rgbm.colors.yellow -- flag colour   
+    }
+
+    audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
+    audioSCGoGreenEvent.volume = 5
+    audioSCGoGreenEvent:start()
+
+end
+
+--####################################################################################################
+--####################################### INITIALIZATION #############################################
+--####################################################################################################
+
+local function initialize()
+    writeLog("SC Flags: Initialization starting")
+
+    --timers
+    timeAccumulator = 0
+    thirdSecWaitTimer = 0
+    halfSecWaitTimer = 0
+    tenthSecWaitTimer = 0
+    goGreenTimer = 0
+
+    --track race leader
+    raceLeaderCar = nil
+    prevRaceLeaderCar = nil
+    leaderChangedLastBeat = false
+    raceLeaderLapCount = -1
+
+    --sim stuff
+    sim = ac.getSim()
+    trackLength = sim.trackLengthM
+    driverCar = ac.getCar(0)
+
+    --reset SC flags to inactive (will turn off the flags)
+    scInactive()
+
+    --fetch the admin and safety cars
+    getAdminAndSafetyCars()
+
+    writeLog("SC Flags: Initialization finished - sending notification messages.")
+    if (driverCar ==nil) then
+        writeLog("SC Flags: Initialization finished - Initialisation ERROR driverCar not identified!")
+        ac.sendChatMessage("SC: INFO | SC Flags Script " .. SCRIPT_VERSION .. " Initialisation ERROR driverCar not identified!")
+    elseif (safetyCar == nil) then
+        writeLog("SC Flags: Initialization finished - Initialisation ERROR safetyCar not identified!")
+        ac.sendChatMessage("SC: INFO | SC Flags Script " .. SCRIPT_VERSION .. " Initialisation ERROR safetyCar not identified for driver " .. driverCar:driverName())
+    else
+        writeLog("SC Flags: Initialization finished - Initialisation successful")
+        ac.sendChatMessage("SC: INFO | SC Flags Script " .. SCRIPT_VERSION .. " Initialisation " .. driverCar:driverName() .. " - SC - " .. safetyCar:driverName())
+    end
+end
+
+--force reinit whenever session changes or script reloads
+ac.onSessionStart(function(sessionIndex, restarted)
+    initialize()
+end)
+
+function script.reset()
+    writeLog("SC Flags: Flag Script Reset")
+    initialize()
+end
+
+ac.onRelease(function()
+    writeLog("SC Flags: Flag Script Released/Reload")
+    initialize()
+end)
+
+initialize()
+
+
+--####################################################################################################
+--####################################### GAME LOOP ##################################################
+--####################################################################################################
+
+--chat message processing - will cause various state transitions
+ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
+    if string.startsWith(message, "SC") then
+        --refresh the admin and safety car details
+        getAdminAndSafetyCars()
+
+        if safetyCar then
+
+            if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
+                writeLog("Chatmsg received: " .. message)
+                --rolling start invoked
+                if message == "SC: Safety Car rolling start" then
+                    writeLog("SC Flags: Recieved - Safety Car rolling start")
+                    scRollingStart()
+                --sc deployed and on track
+                elseif message == "SC: Safety Car deployed" then
+                    scDeployed()
+                --sc coming in after rolling start
+                elseif message == "SC: Safety Car Rolling Start Coming In" then
+                    scRollingComingIn()
+                --sc coming in after deployment
+                elseif message == "SC: Safety Car in this lap" then
+                    scInThisLap()
+                --sc made it back to pits
+                elseif message == "SC: Safety Car is clear" then
+                    scIsClear()
+                --sc being killed
+                elseif message == "SC kill" then
+                    writeLog("SC Flags: Recieved - SC kill")
+                    --treat this like the SC has gone in
+                    scInThisLap()
+                    scIsClear()
+                --flags kill switch
+                elseif message == "SC kf" then 
+                    writeLog("SC Flags: Recieved - SC kf")
+                    initialize()
+                end
+            end
+        end
+    end
+    return true
+end)
+
+-- Determine the race leader - because AC is a fucker, for safety we only update to the new race leader if it stays that way for 2 consecutive beats
+local function updateRaceLeader()
+
+    local index = 0
+    local acReportedLeaderCar = ac.getCar.leaderboard(index)
+    local fallbackCar = nil  -- will store the first non-safety-car we find
+
+    while acReportedLeaderCar ~= nil do
+        if acReportedLeaderCar ~= safetyCar then
+            if fallbackCar == nil then
+                fallbackCar = acReportedLeaderCar
+            end
+            -- If it is not in the pit lane, then it’s our leader.
+            if not (acReportedLeaderCar.isInPit or acReportedLeaderCar.isInPitlane) then
+                break
+            end
+        end
+        -- Move on to the next car in the leaderboard.
+        index = index + 1
+        acReportedLeaderCar = ac.getCar.leaderboard(index)
+        
+    end
+    -- If we exited the loop with no valid leader (because acReportedLeaderCar is nil
+    -- or every non-safety-car was in pit/pitlane), fall back to the first non-safety-car found.
+    if acReportedLeaderCar == nil then
+        acReportedLeaderCar = fallbackCar
+    end
+
+    --first beat so we just have to trust it
+    if raceLeaderCar == nil then
+        raceLeaderCar = acReportedLeaderCar
+        --writeLog("Race leader is: " .. raceLeaderCar:driverName())
+    else
+        --not first beat, did leader car change last beat? 
+        if leaderChangedLastBeat == true then
+            --it did, and is it still reporting the same leader?
+            if prevRaceLeaderCar == acReportedLeaderCar then
+                --it is so all good, we can trust it
+                raceLeaderCar = acReportedLeaderCar
+                writeLog("Race leader change - leader now is: " .. raceLeaderCar:driverName())
+                leaderChangedLastBeat = false
+            else
+                --it changed again, we can't trust this
+                writeLog("Race leader consecutive change - discarding: " .. raceLeaderCar:driverName())
+                prevRaceLeaderCar = acReportedLeaderCar
+            end
+        else
+            --leader did not change last beat, has it changed this beat?
+            if acReportedLeaderCar ~= raceLeaderCar then
+                --it has, so store the current value for a beat
+                leaderChangedLastBeat = true
+                prevRaceLeaderCar = acReportedLeaderCar
+            end
+        end
+    end
+end
+
+-- Calculate the normalized distance between 2 cars
+local function calculateDistanceTo(carPosition, otherPosition)
+    if carPosition > otherPosition then
+        otherPosition = otherPosition + 1
+    end
+    return otherPosition - carPosition  -- Always a value between 0 and 1
+end
+
+-- get the updated helper text
+local function getHelperText()
+
+    local carAhead = nil
+    local carAheadDistance = 1 -- Initialize with maximum possible spline position difference
+
+    -- Calculate the distance behind the safety car
+
+    if driverCar == nil then
+        writeLog("ERROR: In get helper text and driver car is nil!!")
+        -- try and get it again
+        driverCar = ac.getCar(0)
+        return
+    end
+
+    local distanceBehindSC = calculateDistanceTo(driverCar.splinePosition, safetyCar.splinePosition)
+
+    -- Find the next car ahead on track and get the distance ahead
+    if driverCar == raceLeaderCar then
+        --if we are race keader then force car ahead to be the SC
+        carAhead = safetyCar
+        carAheadDistance = distanceBehindSC
+    else
+        --for everyone else then step across all other cars and find the one with the lowest distance ahead of us
+        for i, otherCar in ac.iterateCars.ordered() do
+            if otherCar ~= safetyCar and otherCar ~= driverCar and otherCar.isConnected and not (otherCar.isInPitlane or otherCar.isInPit) then
+                local distanceAhead = calculateDistanceTo(car.splinePosition, otherCar.splinePosition)
+                if distanceAhead > 0 and distanceAhead < carAheadDistance then
+                    carAheadDistance = distanceAhead
+                    carAhead = otherCar
+                end
+            end
+        end
+    end
+
+    --writeLog("Car ahead is: " .. carAhead:driverName() .. " and is " .. minDistanceAhead * trackLength .. " ahead")
+
+    -- first check are we between the leader and the safety car, in which case we need to pass the SC and catch back up
+    if driverCar ~= raceLeaderCar then
+        if raceLeaderCar ~= nil then
+            local distanceBehindLeader = calculateDistanceTo(car.splinePosition, raceLeaderCar.splinePosition)
+            local betweenLeaderAndSafetyCar = (distanceBehindLeader >= distanceBehindSC)
+            if betweenLeaderAndSafetyCar then
+                return "PASS SAFETY CAR - CATCH PACK"
+            end
+        else
+            writeLog("WARNING: in getHelperText - Race leader car is nil!")
+        end
+    end
+
+    -- next check, are we too far behind and need to catch up, or close enough but not quite and should close gap
+    if carAhead then
+        local carAheadDistanceInM = carAheadDistance * trackLength
+        
+        --way back so use catch message (differs slightly if you are the race leader)
+        if (carAheadDistanceInM > (distanceThreshold * distanceThresholdMultiplier)) then
+            if driverCar == raceLeaderCar then
+                return "CATCH THE SAFETY CAR" .. " - " .. math.floor(carAheadDistanceInM) .. "m"
+            else
+                return "CATCH THE CAR AHEAD" .. " - " .. math.floor(carAheadDistanceInM) .. "m"
+            end
+        end
+
+        --close gap check
+        if carAheadDistanceInM > distanceThreshold then
+            return "TOO FAR - CLOSE GAP" .. " - " .. math.floor(carAheadDistanceInM) .. "m"
+        end
+    end
+
+    --no checks hit so just go with NO OVERTAKING
+    return "NO OVERTAKING"
+    
+end
+
+--runs every frame
 function script.update(dt)
+
+    --for rolling starts it will go: inactive -> rolling -> rollingComingIn -> green -> inactive
+    --for normal SC callouts it will go: inactive -> deployed -> comingIn -> clear -> green -> inactive
 
     --accumulate total time
     timeAccumulator = timeAccumulator + dt
-
-    --[[
-    ac.debug("Time Accumulator", timeAccumulator)
-
-    ac.debug("SC Flags: 1-rollingStart", rollingStart)
-    ac.debug("SC Flags: 3-conditionsMet", conditionsMet)
-    ac.debug("SC Flags: 4-scOnTrack", scOnTrack)
-    ac.debug("SC Flags: 5-scClear", scCleared)
-    if driverCar then
-        ac.debug("SC Flags: 6-driverCar", driverCar:driverName())
-    end
-    if raceLeaderCar then
-        ac.debug("SC Flags: 7-leaderboard #1", raceLeaderCar:driverName())
-    end
-    if safetyCar then
-        ac.debug("SC Flags: 8-safetyCar", safetyCar:driverName())
-    end
-    ac.debug("SC Flags: 9-showFlags", showFlags)
-    ac.debug("SC Flags: flagWindowPos", flagWindowPos)
-    ac.debug("SC Flags: directMessageAvailable", sim.directMessagingAvailable)
-    ]]--
 
     --don't do anything for first 2 seconds
     if timeAccumulator < 2 then
         return
     end
 
-    --sanity check on states being set correctly
-    if timeAccumulator - checkStatesAccumulator >= checkStatesInterval then
-        -- Check if all states exist; if not, re-initialize them
-        if not sim or not currentSession or not driverCar or not safetyCar or not adminCars then
-            writeLog("SC Flags: Lost state somehow so reinit")
-            getStates()
+    --check if we should clear the green flag - do this up here as we need to ensure nothing can stop this happening
+    if scFlagsState.status == "green" then
+        if timeAccumulator - goGreenTimer >= 5 then
+            goGreenTimer = 0
+            scInactive()
         end
-        checkStatesAccumulator = timeAccumulator
     end
 
+    --recheck for asdmin and safety car every 0.5s
+    if timeAccumulator - halfSecWaitTimer >= 0.5 then
+        --refresh the admin and safety car details
+        getAdminAndSafetyCars()
+
+        halfSecWaitTimer = timeAccumulator
+    end
+
+    --reinit 20s before race start 
     if sim.timeToSessionStart <= 20000 and sim.timeToSessionStart > 19000 then
-        initializeSCFlagScript()
+        initialize()
+    end
+
+    --update the location if the settings are being tweaked
+    if scFlagsValues.settingsOpen then
+        flagWindowPos = scFlagsValues.posVec2
     end
 
     -- If the Safety Car is not present, return
     if not safetyCar then return end
 
-    if scFlagsValues.settingsOpen then
-        repositionFlags()
+    --if the SC is inactive then sanity check the SC is not on track
+    if scFlagsState.status == "inactive" then
+        --XXXTODO - sanity check here
+
+        return
     end
 
-    if showFlags or debug then        
-  
-        --[[ ac.debug("SC FLags: Time Accumulator", timeAccumulator)
-        ac.debug("SC FLags: showFlags", showFlags)
-        ac.debug("SC FLags: goGreen", goGreen)
-        ac.debug("SC FLags: scState", scStatusText)
-        ac.debug("SC FLags: flagWindowPos", flagWindowPos)
-        ac.debug("SC Flags: scStatusText", scStatusText) ]]
+    --helper text update
+    --do this every 0.1 secs
+    if timeAccumulator - tenthSecWaitTimer >= 0.1 then
 
-        if scOnTrack or conditionsMet then
-            -- Determine the race leader
-            if timeAccumulator - leaderCheckTime >= medCheckInterval then
-                
-                local index = 0
-                local acReportedLeaderCar = ac.getCar.leaderboard(index)
-                local fallbackCar = nil  -- will store the first non-safety-car we find
+        --helper text is updated for rolling, deployed, comingIn & clear
 
-                while acReportedLeaderCar ~= nil do
-                    if acReportedLeaderCar ~= safetyCar then
-                        if fallbackCar == nil then
-                            fallbackCar = acReportedLeaderCar
-                        end
-                        -- If it is not in the pit lane, then it’s our leader.
-                        if not (acReportedLeaderCar.isInPit or acReportedLeaderCar.isInPitlane) then
-                            break
-                        end
-                    end
-                    -- Move on to the next car in the leaderboard.
-                    index = index + 1
-                    acReportedLeaderCar = ac.getCar.leaderboard(index)
-                    
-                end
-                -- If we exited the loop with no valid leader (because acReportedLeaderCar is nil
-                -- or every non-safety-car was in pit/pitlane), fall back to the first non-safety-car found.
-                if acReportedLeaderCar == nil then
-                    acReportedLeaderCar = fallbackCar
-                end
+        if scFlagsState.status == "rolling" or scFlagsState.status == "deployed" or scFlagsState.status == "comingIn" or scFlagsState.status == "clear" then
 
-                --first beat so we just have to trust it
-                if raceLeaderCar == nil then
-                    raceLeaderCar = acReportedLeaderCar
-                    --writeLog("Race leader is: " .. raceLeaderCar:driverName())
-                else
-                    --not first beat, did leader car change last beat? 
-                    if leaderChangedLastBeat == true then
-                        --it did, and is it still reporting the same leader?
-                        if prevRaceLeaderCar == acReportedLeaderCar then
-                            --it is so all good, we can trust it
-                            raceLeaderCar = acReportedLeaderCar
-                            writeLog("SC Flags: Race leader change - leader now is: " .. raceLeaderCar:driverName())
-                            leaderChangedLastBeat = false
-                        else
-                            --it changed again, we can't trust this
-                            prevRaceLeaderCar = acReportedLeaderCar
-                        end
-                    else
-                        --leader did not change last beat, has it changed this beat?
-                        if acReportedLeaderCar ~= raceLeaderCar then
-                            --it has, so store the current value for a beat
-                            leaderChangedLastBeat = true
-                            prevRaceLeaderCar = acReportedLeaderCar
-                        end
-                    end
-                end
-                leaderCheckTime = timeAccumulator
-            end
+            -- Check positions and update helper text
+            scFlagsState.helperText = getHelperText()
 
-            -- Check positions and helper text
-            if timeAccumulator - posCheckAccumulator >= miniCheckInterval then
-                checkPos(dt)
-                posCheckAccumulator = timeAccumulator
-            end
+            --XXXTODO - implement latch on helpertext to not update unless it stays the same for 2 beats?
+
+        end
+
+        tenthSecWaitTimer = timeAccumulator
+    end
+
+    --do this every 0.3 secs
+    --race leader check update
+    if timeAccumulator - thirdSecWaitTimer >= 0.3 then
+        --update the race leader
+        updateRaceLeader()
+
+        if raceLeaderCar ~=nil then
+            raceLeaderLapCount = raceLeaderCar.lapCount
+        else
+            raceLeaderLapCount = -1
+            writeLog("WARNING: Updated race leader and race leader is nil!!")
+            return
         end
         
-        if scCleared and scOnTrack then
-            writeLog("SC: Status - Entering Pit")
-            scHelperText = scHelperTextState.noOvertake
-            if timeAccumulator - timeToDisplayTextAccumulator >= timeToDisplaySCText then
-                scStatusText = scState.off
-                flagColor = rgbm(0.3, 0.3, 0.3, 1)
-                scTextColor = rgbm(1, 0.27, 0.02, 1)
-                scOnTrack = false
-                writeLog("SC: Status - Get Ready")
-                timeToDisplayTextAccumulator = timeAccumulator
+        thirdSecWaitTimer = timeAccumulator
+
+    end
+
+    -- Go green same time
+
+    --waiting for this if the status is rollingComingIn or clear
+    if scFlagsState.status == "rollingComingIn" or scFlagsState.status == "clear" then
+
+        if raceLeaderCar ~=nil then
+            if raceLeaderLapCount == -1 then
+                writeLog("WARNING: In green check and race leader lap count is not initialised")
+                return
             end
-        end
 
-        -- Show flags for 5 seconds
-        if goGreen then
-            if timeAccumulator - timeToDisplayGreenAccumulator >= timeToDisplayGreen then
-                showFlags = false
-                scOnTrack = false
-                goGreen = false
-                scCleared = false
+            if raceLeaderCar.lapCount > raceLeaderLapCount then
+                writeLog("Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
 
-                writeLog("SC: Gone green - Flags off")
-                timeToDisplayGreenAccumulator = timeAccumulator
-                
-                --reInitialize here to reset all values once flags disapear
-                reInitializeVars()
-            end
-        end
-        
-        --######################
-        -- Get lap counts when SC called in
-        if getCarLapCounts then
-            writeLog("SC Flags: Getting car lap counts")
-            for i, car in ac.iterateCars.leaderboard() do
-                -- Edge case - ignore straglers who might be behind Start Finish but ahead of SC when it clears
-                -- TODO: Not sure about this
-                if car.splinePosition > safetyCar.splinePosition then
-                    carLapCounts[car.index] = 9999
-                else
-                    carLapCounts[car.index] = car.lapCount or 0
-                end
-                writeLog("SC Flags: Car ID: " .. car.index .. " on lap " .. car.lapCount)
-            end
-            --checkGoGreen = true
-            getCarLapCounts = false
-        end
+                --green light trigger
+                scGoGreen()
 
-        --######################
-        -- Go green same time
-        if checkGoGreen then
-            if raceLeaderCar ~=nil and raceLeaderCar.lapCount > carLapCounts[raceLeaderCar.index] then
-                writeLog("SC Flags: Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
-                flagColor = rgbm(0,225,0,1)
-                scHeadingTextColor = rgbm(0,225,0,1)
-                scHeadingText = scHeadingTextState.green
-                scStatusText = scState.off
-                scLeaderText = scLeaderTextState.off
-                scHelperText = scHelperTextState.off
-
-                --TODO
-                --Do this in SC script?
-                --How do we log this with online scripts?
-                --
-                if rollingStart then
-                    writeLog("SC Flags: Go green from rolling start")
-                    -- Penalize speeding
-                    --TODO: Add UI text element
-                    local penalty = 0
-                    driverCarSpeed = math.floor(driverCar.speedKmh * 10) / 10
-                    if driverCarSpeed > 160 then penalty = 90
-                    elseif driverCarSpeed > 140 then penalty = 45
-                    elseif driverCarSpeed > 120 then penalty = 20
-                    elseif driverCarSpeed > 110 then penalty = 10
-                    elseif driverCarSpeed > 105 then penalty = 5
-                    end
-                    if penalty > 0 then
-                        --ac.sendChatMessage("SC: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
-                        writeLog("SC Flags: INFO | " .. driverCar:driverName() .. " - PENALTY " .. penalty .. "s")
-                    end
-                end
-
-                audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-                audioSCGoGreenEvent.volume = 5
-                audioSCGoGreenEvent:start()
-
-                showFlags = true
-                goGreen = true
-                checkGoGreen = false
-                
-                conditionsMet = false
-
-                timeToDisplayGreenAccumulator = timeAccumulator
-
+                --send out green light received chat message
                 writeLog("SC Flags: About to send green light chat message back")
 
                 if driverCar ~= nil and raceLeaderCar ~= nil then
                     local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
                     local timeLeft = sim.sessionTimeLeft
-                    if rollingStart then
+                    if scFlagsState.status == "rollingComingIn" then
                         ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
                     else
                         ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
                     end
                 end
-
-                rollingStart = false
-
-                
             end
+        else
+            writeLog("WARNING: In green check and race leader is nil!!")
         end
-        -- Go green same time end
-        --######################
     end
 end
-
-ac.onSessionStart(function(sessionIndex, restarted)
-    initializeSCFlagScript()
-    --setConditionsLateJoin()
-    currentSession = ac.getSession(sessionIndex)
-end)
-
-function script.reset()
-    initializeSCFlagScript()
-    writeLog("SC Flags: Flag Script Reset")
-end
-
---ac.onRelease(initializeSCFlagScript)
-ac.onRelease(function()
-    initializeSCFlagScript()
-    writeLog("SC Flags: Flag Script Released/Reload")
-end)
-
-initializeSCFlagScript()
---setConditionsLateJoin()
