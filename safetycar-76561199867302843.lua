@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.12"
-SCRIPT_VERSION_CODE = 00012
+SCRIPT_VERSION = "0.0.1.13"
+SCRIPT_VERSION_CODE = 00013
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -810,7 +810,7 @@ function script.update(dt)
                 writeLog("SC State Transitioning from " .. scState .. " to comingIn")
                 scState = "comingIn"
                 setSCValues(scComingInState, true)
-                sendMessageWithRetry("SC: Safety Car in this lap")
+                sendMessageWithRetry("SC: Safety Car Rolling Start Coming In")
                 scLapCountWhenCalledIn = safetyCar.lapCount
                 writeLog("SC Lap count at call in is: " .. tostring(scLapCountWhenCalledIn))
             end
