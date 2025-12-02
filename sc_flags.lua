@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.1"
-SCRIPT_VERSION_CODE = 00001
+SCRIPT_VERSION = "0.0.1.2"
+SCRIPT_VERSION_CODE = 00002
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -282,7 +282,7 @@ local function uiFlags(dt)
         --there are 2 states for the flags box - the normal one, and the one with the speed limit display
         --the speed limit display is shown for the leader when the SC is coming in after deployment
         --and is shown for everyone if the sc is coming in after a rolling start
-        if not (scFlagsState.status == "rollingComingIn" or (scFlagsState.status == "rollingComingIn" and driverCar == raceLeaderCar)) then
+        if not (scFlagsState.status == "rollingComingIn" or (scFlagsState.status == "comingIn" and driverCar == raceLeaderCar)) then
             --Draw main flag box for everyone
             ui.drawRectFilled(scHeadingTextBoxStart, scHeadingTextBoxEnd, scHeadingTextBG, 5, ui.CornerFlags.Top)
             ui.dwriteDrawText(scFlagsState.headingText, headFontSize, scHeadingTextStart, scFlagsState.headingTextColor)
@@ -543,10 +543,6 @@ local function scInactive()
         flagColor = rgbm.colors.yellow -- flag colour   
     }
 
-    audioSCGoGreenEvent = ac.AudioEvent.fromFile(scGoGreenAudio, false)
-    audioSCGoGreenEvent.volume = 5
-    audioSCGoGreenEvent:start()
-
 end
 
 --####################################################################################################
@@ -806,6 +802,8 @@ function script.update(dt)
     --accumulate total time
     timeAccumulator = timeAccumulator + dt
 
+    ac.debug("Status", scFlagsState.status)
+
     --don't do anything for first 2 seconds
     if timeAccumulator < 2 then
         return
@@ -851,15 +849,16 @@ function script.update(dt)
     --do this every 0.1 secs
     if timeAccumulator - tenthSecWaitTimer >= 0.1 then
 
-        --helper text is updated for rolling, deployed, comingIn & clear
+        --helper text is updated for rolling, deployed or comingIn
 
-        if scFlagsState.status == "rolling" or scFlagsState.status == "deployed" or scFlagsState.status == "comingIn" or scFlagsState.status == "clear" then
+        if scFlagsState.status == "rolling" or scFlagsState.status == "deployed" or scFlagsState.status == "comingIn" then
 
             -- Check positions and update helper text
             scFlagsState.helperText = getHelperText()
 
             --XXXTODO - implement latch on helpertext to not update unless it stays the same for 2 beats?
-
+        else
+            scFlagsState.helperText = ""
         end
 
         tenthSecWaitTimer = timeAccumulator
