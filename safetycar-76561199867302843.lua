@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.13"
-SCRIPT_VERSION_CODE = 00013
+SCRIPT_VERSION = "0.0.1.14"
+SCRIPT_VERSION_CODE = 00014
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -228,7 +228,7 @@ local scComingInState = {
     autopilotOn = true,
     scTopSpeed = 180,
     pitStopRequest = true,
-    lightsOn = true,
+    lightsOn = false,
     throttleLimit = 0.5,
     aggression = 0.8
 }
@@ -237,7 +237,7 @@ local scBackToPitLaneState = {
     autopilotOn = true,
     scTopSpeed = 25,
     pitStopRequest = true,
-    lightsOn = true,
+    lightsOn = false,
     throttleLimit = 0.5,
     aggression = 0.8
 }
