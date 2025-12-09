@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.4"
-SCRIPT_VERSION_CODE = 00004
+SCRIPT_VERSION = "0.0.1."
+SCRIPT_VERSION_CODE = 00005
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -296,10 +296,8 @@ local function uiFlags(dt)
                     ui.dwriteDrawText(scFlagsState.leaderText, helperFontsize, scLeaderTextStart, scLeaderTextColor)
                     scHelperTextStart = scHelperTextStart + vec2(0, scHelperTextSize.y + 2)
                 end
-                if true then
-                    -- All driver helper text
-                    ui.dwriteDrawText(scFlagsState.helperText, helperFontsize, scHelperTextStart, scHelperTextColor)
-                end
+                -- All driver helper text
+                ui.dwriteDrawText(scFlagsState.helperText, helperFontsize, scHelperTextStart, scHelperTextColor)
             end
         --Speed limit display
         else
@@ -493,7 +491,7 @@ local function scIsClear()
         statusText = "CLEAR", --Main display text / top line of the coming in box
         statusTextColor = rgbm.colors.yellow, -- status text colour
         speedText = "", --only shown on the coming in box, in the middle
-        helperText = "NO OVERTAKING", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        helperText = "NO OVERTAKING UNTIL GREEN FLAG", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
         leaderText = "GO AT ANY TIME", --Special sub text for the leader
         flagColor = rgbm(0.4, 0.4, 0.4, 1) -- flag colour   
     }
@@ -865,8 +863,6 @@ function script.update(dt)
             scFlagsState.helperText = getHelperText()
 
             --XXXTODO - implement latch on helpertext to not update unless it stays the same for 2 beats?
-        else
-            scFlagsState.helperText = ""
         end
 
         tenthSecWaitTimer = timeAccumulator
