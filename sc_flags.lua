@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1."
-SCRIPT_VERSION_CODE = 00005
+SCRIPT_VERSION = "0.0.1.6"
+SCRIPT_VERSION_CODE = 00006
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -491,7 +491,7 @@ local function scIsClear()
         statusText = "CLEAR", --Main display text / top line of the coming in box
         statusTextColor = rgbm.colors.yellow, -- status text colour
         speedText = "", --only shown on the coming in box, in the middle
-        helperText = "NO OVERTAKING UNTIL GREEN FLAG", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
+        helperText = "NO OVERTAKING UNTIL GREEN", --helper text shown below to give guidance (e.g. catch up etc.) - usually dynamic and will change frequently
         leaderText = "GO AT ANY TIME", --Special sub text for the leader
         flagColor = rgbm(0.4, 0.4, 0.4, 1) -- flag colour   
     }
