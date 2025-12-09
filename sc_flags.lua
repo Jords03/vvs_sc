@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.7"
-SCRIPT_VERSION_CODE = 00007
+SCRIPT_VERSION = "0.0.1.8"
+SCRIPT_VERSION_CODE = 00008
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -28,7 +28,7 @@ local goGreenTimer = 0
 local raceLeaderCar = nil
 local prevRaceLeaderCar = nil
 local leaderChangedLastBeat = false
-local raceLeaderLapCount = -1
+local carLapCounts = {}
 
 --sim stuff
 local sim = ac.getSim()
@@ -72,6 +72,16 @@ local function tableContains(testTable, value)
     end
     return false
   end
+
+--grab all car lap counts
+local function getCarLapCounts()
+    writeLog("Getting car lap counts")
+    carLapCounts = {}
+    for i, car in ac.iterateCars.leaderboard() do
+        carLapCounts[car.index] = car.lapCount or 0
+        writeLog("Car ID: " .. car.index .. " on lap " .. car.lapCount)
+    end
+end
 
 
 --####################################################################################################
@@ -457,6 +467,11 @@ local function scRollingComingIn()
     audioSCInThisLapEvent.volume = 5
     audioSCInThisLapEvent:start()
 
+    --get all car lap counts
+    getCarLapCounts()
+
+    writeLog("Set Safety Car to rollingComingIn Done")
+
 end
 
 local function scInThisLap()
@@ -499,6 +514,9 @@ local function scIsClear()
     audioSCClearEvent = ac.AudioEvent.fromFile(scClearAudio, false)
     audioSCClearEvent.volume = 5
     audioSCClearEvent:start()
+
+    --get all car lap counts
+    getCarLapCounts()
 
     writeLog("Set Safety Car is clear Done")
 end
@@ -561,7 +579,7 @@ local function initialize()
     raceLeaderCar = nil
     prevRaceLeaderCar = nil
     leaderChangedLastBeat = false
-    raceLeaderLapCount = -1
+    carLapCounts = {}
 
     --sim stuff
     sim = ac.getSim()
@@ -616,9 +634,8 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
         getAdminAndSafetyCars()
 
         if safetyCar then
-
+            writeLog("Chatmsg received: " .. message)
             if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
-                writeLog("Chatmsg received: " .. message)
                 --rolling start invoked
                 if message == "SC: Safety Car rolling start" then
                     writeLog("SC Flags: Recieved - Safety Car rolling start")
@@ -868,44 +885,6 @@ function script.update(dt)
         tenthSecWaitTimer = timeAccumulator
     end
 
-
-    -- Go green same time
-
-    --waiting for this if the status is rollingComingIn or clear
-    if scFlagsState.status == "rollingComingIn" or scFlagsState.status == "clear" then
-
-        if raceLeaderCar ~=nil then
-            if raceLeaderLapCount == -1 then
-                writeLog("WARNING: In green check and race leader lap count is not initialised")
-            else
-                if raceLeaderCar.lapCount > raceLeaderLapCount then
-                    writeLog("Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
-
-                    --green light trigger
-                    scGoGreen()
-
-                    --send out green light received chat message
-                    writeLog("SC Flags: About to send green light chat message back")
-
-                    if driverCar ~= nil and raceLeaderCar ~= nil then
-                        local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-                        local timeLeft = sim.sessionTimeLeft
-                        if scFlagsState.status == "rollingComingIn" then
-                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
-                        else
-                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
-                        end
-                    end
-                end
-            end
-
-            
-        else
-            writeLog("WARNING: In green check and race leader is nil!!")
-        end
-    end
-
-    
     --do this every 0.3 secs
     --race leader check update
     if timeAccumulator - thirdSecWaitTimer >= 0.3 then
@@ -913,14 +892,69 @@ function script.update(dt)
         updateRaceLeader()
 
         if raceLeaderCar ~=nil then
-            raceLeaderLapCount = raceLeaderCar.lapCount
-        else
-            raceLeaderLapCount = -1
             writeLog("WARNING: Updated race leader and race leader is nil!!")
-            return
         end
-        
+
         thirdSecWaitTimer = timeAccumulator
 
+    end
+
+    -- Go green same time
+
+    --waiting for this if the status is rollingComingIn or clear
+    if scFlagsState.status == "rollingComingIn" or scFlagsState.status == "clear" then
+
+        local sfCrossed = false
+
+        --check this for top 3 cars for safety
+        local acReportedLeaderCar = ac.getCar.leaderboard(0)
+        if acReportedLeaderCar ~= nil then
+            if acReportedLeaderCar ~= safetyCar then
+                if acReportedLeaderCar.lapCount > carLapCounts[acReportedLeaderCar.index] then
+                    sfCrossed = true
+                    writeLog("Leader Car ID: " .. acReportedLeaderCar:driverName() .. " crossed start finish")
+                end
+            end
+        end
+
+        local acReported2ndCar = ac.getCar.leaderboard(1)
+        if acReported2ndCar ~= nil then
+            if acReported2ndCar ~= safetyCar then
+                if acReported2ndCar.lapCount > carLapCounts[acReported2ndCar.index] then
+                    sfCrossed = true
+                    writeLog("WARNING: Missed leader crossing SF - Car in second - Car ID: " .. acReported2ndCar:driverName() .. " crossed start finish")
+                end
+            end
+        end
+
+        local acReported3rdCar = ac.getCar.leaderboard(2)
+        if acReported3rdCar ~= nil then
+            if acReported3rdCar ~= safetyCar then
+                if acReported3rdCar.lapCount > carLapCounts[acReported3rdCar.index] then
+                    sfCrossed = true
+                    writeLog("WARNING: Missed leader crossing SF - Car in third - Car ID: " .. acReported3rdCar:driverName() .. " crossed start finish")
+                end
+            end
+        end
+
+        if sfCrossed then
+            --green light trigger
+            scGoGreen()
+
+            writeLog("GREEN LIGHT")
+
+            --send out green light received chat message
+            if driverCar ~= nil then
+                local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
+                local timeLeft = sim.sessionTimeLeft
+                if scFlagsState.status == "rollingComingIn" then
+                    ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
+                else
+                    ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
+                end
+            end         
+        else
+            writeLog("WARNING: In green check and race leader is nil!!")
+        end
     end
 end
