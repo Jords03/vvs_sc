@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.6"
-SCRIPT_VERSION_CODE = 00006
+SCRIPT_VERSION = "0.0.1.7"
+SCRIPT_VERSION_CODE = 00007
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -868,6 +868,44 @@ function script.update(dt)
         tenthSecWaitTimer = timeAccumulator
     end
 
+
+    -- Go green same time
+
+    --waiting for this if the status is rollingComingIn or clear
+    if scFlagsState.status == "rollingComingIn" or scFlagsState.status == "clear" then
+
+        if raceLeaderCar ~=nil then
+            if raceLeaderLapCount == -1 then
+                writeLog("WARNING: In green check and race leader lap count is not initialised")
+            else
+                if raceLeaderCar.lapCount > raceLeaderLapCount then
+                    writeLog("Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
+
+                    --green light trigger
+                    scGoGreen()
+
+                    --send out green light received chat message
+                    writeLog("SC Flags: About to send green light chat message back")
+
+                    if driverCar ~= nil and raceLeaderCar ~= nil then
+                        local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
+                        local timeLeft = sim.sessionTimeLeft
+                        if scFlagsState.status == "rollingComingIn" then
+                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
+                        else
+                            ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
+                        end
+                    end
+                end
+            end
+
+            
+        else
+            writeLog("WARNING: In green check and race leader is nil!!")
+        end
+    end
+
+    
     --do this every 0.3 secs
     --race leader check update
     if timeAccumulator - thirdSecWaitTimer >= 0.3 then
@@ -884,40 +922,5 @@ function script.update(dt)
         
         thirdSecWaitTimer = timeAccumulator
 
-    end
-
-    -- Go green same time
-
-    --waiting for this if the status is rollingComingIn or clear
-    if scFlagsState.status == "rollingComingIn" or scFlagsState.status == "clear" then
-
-        if raceLeaderCar ~=nil then
-            if raceLeaderLapCount == -1 then
-                writeLog("WARNING: In green check and race leader lap count is not initialised")
-                return
-            end
-
-            if raceLeaderCar.lapCount > raceLeaderLapCount then
-                writeLog("Leader Car ID: " .. raceLeaderCar:driverName() .. " crossed start finish")
-
-                --green light trigger
-                scGoGreen()
-
-                --send out green light received chat message
-                writeLog("SC Flags: About to send green light chat message back")
-
-                if driverCar ~= nil and raceLeaderCar ~= nil then
-                    local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
-                    local timeLeft = sim.sessionTimeLeft
-                    if scFlagsState.status == "rollingComingIn" then
-                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
-                    else
-                        ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator .. " | " .. raceLeaderCar:driverName())
-                    end
-                end
-            end
-        else
-            writeLog("WARNING: In green check and race leader is nil!!")
-        end
     end
 end
