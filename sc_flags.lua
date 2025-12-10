@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.8"
-SCRIPT_VERSION_CODE = 00008
+SCRIPT_VERSION = "0.0.1.9"
+SCRIPT_VERSION_CODE = 00009
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -78,7 +78,7 @@ local function getCarLapCounts()
     writeLog("Getting car lap counts")
     carLapCounts = {}
     for i, car in ac.iterateCars.leaderboard() do
-        carLapCounts[car.index] = car.lapCount or 0
+        carLapCounts[car.index] = car.lapCount
         writeLog("Car ID: " .. car.index .. " on lap " .. car.lapCount)
     end
 end
@@ -910,9 +910,13 @@ function script.update(dt)
         local acReportedLeaderCar = ac.getCar.leaderboard(0)
         if acReportedLeaderCar ~= nil then
             if acReportedLeaderCar ~= safetyCar then
-                if acReportedLeaderCar.lapCount > carLapCounts[acReportedLeaderCar.index] then
-                    sfCrossed = true
-                    writeLog("Leader Car ID: " .. acReportedLeaderCar:driverName() .. " crossed start finish")
+                if carLapCounts[acReportedLeaderCar.index] ~=  nil then
+                    if acReportedLeaderCar.lapCount ~=  nil then
+                        if acReportedLeaderCar.lapCount > carLapCounts[acReportedLeaderCar.index] then
+                            sfCrossed = true
+                            writeLog("Leader Car ID: " .. acReportedLeaderCar:driverName() .. " crossed start finish, lap count now: " .. acReportedLeaderCar.lapCount)
+                        end
+                    end
                 end
             end
         end
@@ -920,9 +924,13 @@ function script.update(dt)
         local acReported2ndCar = ac.getCar.leaderboard(1)
         if acReported2ndCar ~= nil then
             if acReported2ndCar ~= safetyCar then
-                if acReported2ndCar.lapCount > carLapCounts[acReported2ndCar.index] then
-                    sfCrossed = true
-                    writeLog("WARNING: Missed leader crossing SF - Car in second - Car ID: " .. acReported2ndCar:driverName() .. " crossed start finish")
+                if carLapCounts[acReported2ndCar.index] ~=  nil then
+                    if acReported2ndCar.lapCount ~=  nil then
+                        if acReported2ndCar.lapCount > carLapCounts[acReported2ndCar.index] then
+                            sfCrossed = true
+                            writeLog("WARNING: Missed leader crossing SF - Car in second - Car ID: " .. acReported2ndCar:driverName() .. " crossed start finish, lap count now: " .. acReported2ndCar.lapCount)
+                        end
+                    end
                 end
             end
         end
@@ -930,9 +938,13 @@ function script.update(dt)
         local acReported3rdCar = ac.getCar.leaderboard(2)
         if acReported3rdCar ~= nil then
             if acReported3rdCar ~= safetyCar then
-                if acReported3rdCar.lapCount > carLapCounts[acReported3rdCar.index] then
-                    sfCrossed = true
-                    writeLog("WARNING: Missed leader crossing SF - Car in third - Car ID: " .. acReported3rdCar:driverName() .. " crossed start finish")
+                if carLapCounts[acReported3rdCar.index] ~=  nil then
+                    if acReported3rdCar.lapCount ~=  nil then
+                        if acReported3rdCar.lapCount > carLapCounts[acReported3rdCar.index] then
+                            sfCrossed = true
+                            writeLog("WARNING: Missed leader crossing SF - Car in third - Car ID: " .. acReported3rdCar:driverName() .. " crossed start finish, lap count now: " .. acReported3rdCar.lapCount)
+                        end
+                    end
                 end
             end
         end
@@ -952,9 +964,7 @@ function script.update(dt)
                 else
                     ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
                 end
-            end         
-        else
-            writeLog("WARNING: In green check and race leader is nil!!")
+            end
         end
     end
 end
