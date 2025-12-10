@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.9"
-SCRIPT_VERSION_CODE = 00009
+SCRIPT_VERSION = "0.0.1.10"
+SCRIPT_VERSION_CODE = 00010
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -891,7 +891,7 @@ function script.update(dt)
         --update the race leader
         updateRaceLeader()
 
-        if raceLeaderCar ~=nil then
+        if raceLeaderCar == nil then
             writeLog("WARNING: Updated race leader and race leader is nil!!")
         end
 
