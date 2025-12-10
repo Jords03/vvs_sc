@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.10"
-SCRIPT_VERSION_CODE = 00010
+SCRIPT_VERSION = "0.0.1.11"
+SCRIPT_VERSION_CODE = 00011
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -78,8 +78,10 @@ local function getCarLapCounts()
     writeLog("Getting car lap counts")
     carLapCounts = {}
     for i, car in ac.iterateCars.leaderboard() do
-        carLapCounts[car.index] = car.lapCount
-        writeLog("Car ID: " .. car.index .. " on lap " .. car.lapCount)
+        if car.isConnected then
+            carLapCounts[car.index] = car.lapCount
+            writeLog("Car ID: " .. car.index .. " ( " .. car:driverName() .. ") on lap " .. car.lapCount)
+        end
     end
 end
 
