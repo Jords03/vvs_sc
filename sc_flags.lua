@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.11"
-SCRIPT_VERSION_CODE = 00011
+SCRIPT_VERSION = "0.0.1.12"
+SCRIPT_VERSION_CODE = 00012
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -952,6 +952,12 @@ function script.update(dt)
         end
 
         if sfCrossed then
+
+            local message = "GREEN LIGHT AFTER SC CALLOUT"
+            if scFlagsState.status == "rollingComingIn" then
+                message = "GREEN LIGHT AFTER ROLLING START"
+            end
+            
             --green light trigger
             scGoGreen()
 
@@ -961,11 +967,7 @@ function script.update(dt)
             if driverCar ~= nil then
                 local timeStamp = os.date("%Y-%m-%d %H:%M:%S")
                 local timeLeft = sim.sessionTimeLeft
-                if scFlagsState.status == "rollingComingIn" then
-                    ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER ROLLING START | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
-                else
-                    ac.sendChatMessage("SC: INFO | GREEN LIGHT AFTER SC CALLOUT | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
-                end
+                ac.sendChatMessage("SC: INFO | " .. message .. " | " .. driverCar:driverName() .. " | " .. driverCar.splinePosition .. " | " .. driverCar.speedKmh .. " | " .. timeStamp .. " | " .. timeLeft .. " | " .. timeAccumulator)
             end
         end
     end
