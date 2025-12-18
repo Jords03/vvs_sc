@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.12"
-SCRIPT_VERSION_CODE = 00012
+SCRIPT_VERSION = "0.0.1.13"
+SCRIPT_VERSION_CODE = 00013
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -666,8 +666,16 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
                 elseif message == "SC kill" then
                     writeLog("SC Flags: Recieved - SC kill")
                     --treat this like the SC has gone in
-                    scInThisLap()
-                    scIsClear()
+                    
+                    if scFlagsState.status == "rolling" or scFlagsState.status == "rollingComingIn" then
+                        scRollingComingIn()
+                        --just update the status text
+                        scFlagsState.statusText = "WATCH FOR GREEN FLAG"
+                    else
+                        scInThisLap()
+                        scIsClear()
+                    end
+                        
                 --flags kill switch
                 elseif message == "SC kf" then 
                     writeLog("SC Flags: Recieved - SC kf")
@@ -908,44 +916,14 @@ function script.update(dt)
 
         local sfCrossed = false
 
-        --check this for top 3 cars for safety
-        local acReportedLeaderCar = ac.getCar.leaderboard(0)
-        if acReportedLeaderCar ~= nil then
-            if acReportedLeaderCar ~= safetyCar then
-                if carLapCounts[acReportedLeaderCar.index] ~=  nil then
-                    if acReportedLeaderCar.lapCount ~=  nil then
-                        if acReportedLeaderCar.lapCount > carLapCounts[acReportedLeaderCar.index] then
-                            sfCrossed = true
-                            writeLog("Leader Car ID: " .. acReportedLeaderCar:driverName() .. " crossed start finish, lap count now: " .. acReportedLeaderCar.lapCount)
-                        end
-                    end
-                end
-            end
-        end
-
-        local acReported2ndCar = ac.getCar.leaderboard(1)
-        if acReported2ndCar ~= nil then
-            if acReported2ndCar ~= safetyCar then
-                if carLapCounts[acReported2ndCar.index] ~=  nil then
-                    if acReported2ndCar.lapCount ~=  nil then
-                        if acReported2ndCar.lapCount > carLapCounts[acReported2ndCar.index] then
-                            sfCrossed = true
-                            writeLog("WARNING: Missed leader crossing SF - Car in second - Car ID: " .. acReported2ndCar:driverName() .. " crossed start finish, lap count now: " .. acReported2ndCar.lapCount)
-                        end
-                    end
-                end
-            end
-        end
-
-        local acReported3rdCar = ac.getCar.leaderboard(2)
-        if acReported3rdCar ~= nil then
-            if acReported3rdCar ~= safetyCar then
-                if carLapCounts[acReported3rdCar.index] ~=  nil then
-                    if acReported3rdCar.lapCount ~=  nil then
-                        if acReported3rdCar.lapCount > carLapCounts[acReported3rdCar.index] then
-                            sfCrossed = true
-                            writeLog("WARNING: Missed leader crossing SF - Car in third - Car ID: " .. acReported3rdCar:driverName() .. " crossed start finish, lap count now: " .. acReported3rdCar.lapCount)
-                        end
+        --check if any car has crossed the S/F
+        for i, car in ac.iterateCars.leaderboard() do
+            if car.isConnected then
+                if car ~= safetyCar then
+                    if carLapCounts[car.index] > car.lapCount then
+                        sfCrossed = true
+                        writeLog("Car " .. car:driverName() .. " crossed start finish, lap count now: " .. car.lapCount)
+                        writeLog("AC thinks these are the top 3 cars in order: " .. ac.getCar.leaderboard(0):driverName() .. "|" .. ac.getCar.leaderboard(1):driverName() .. "|" .. ac.getCar.leaderboard(2):driverName())
                     end
                 end
             end
