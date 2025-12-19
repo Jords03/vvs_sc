@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.13"
-SCRIPT_VERSION_CODE = 00013
+SCRIPT_VERSION = "0.0.1.14"
+SCRIPT_VERSION_CODE = 00014
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -920,10 +920,16 @@ function script.update(dt)
         for i, car in ac.iterateCars.leaderboard() do
             if car.isConnected then
                 if car ~= safetyCar then
-                    if carLapCounts[car.index] > car.lapCount then
-                        sfCrossed = true
-                        writeLog("Car " .. car:driverName() .. " crossed start finish, lap count now: " .. car.lapCount)
-                        writeLog("AC thinks these are the top 3 cars in order: " .. ac.getCar.leaderboard(0):driverName() .. "|" .. ac.getCar.leaderboard(1):driverName() .. "|" .. ac.getCar.leaderboard(2):driverName())
+                    if carLapCounts[car.index] ~= nil then 
+                        if car.lapCount > carLapCounts[car.index]  then
+                            sfCrossed = true
+                            writeLog("Car " .. car:driverName() .. " crossed start finish, lap count now: " .. car.lapCount)
+                            if ac.getCar.leaderboard(0) ~= nil and ac.getCar.leaderboard(1) ~= nil and ac.getCar.leaderboard(2) ~= nil then
+                                writeLog("AC thinks these are the top 3 cars in order: " .. ac.getCar.leaderboard(0):driverName() .. "|" .. ac.getCar.leaderboard(1):driverName() .. "|" .. ac.getCar.leaderboard(2):driverName())
+                            else
+                                writeLog("Less than 3 cars!!") 
+                            end
+                        end
                     end
                 end
             end
