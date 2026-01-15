@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.14"
-SCRIPT_VERSION_CODE = 00014
+SCRIPT_VERSION = "0.0.1.15"
+SCRIPT_VERSION_CODE = 00015
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -380,7 +380,7 @@ local function isTooLateForSC()
         sessionLength = sessionLength + averageBestLapTime
     end
 
-    local scActiveTime = sessionLength - (averageBestLapTime * 2)
+    local scActiveTime = sessionLength - (averageBestLapTime * 4)
     local csTime = sim.sessionTimeLeft * -1
     if csTime > scActiveTime and scActiveTime > 0 then
         return true
