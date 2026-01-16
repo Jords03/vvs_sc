@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.15"
-SCRIPT_VERSION_CODE = 00015
+SCRIPT_VERSION = "0.0.1.16"
+SCRIPT_VERSION_CODE = 00016
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -365,7 +365,7 @@ end
 
 -- For deciding if race is near complete
 -- Calculates the session length and the time the SC should be active for
-local function isTooLateForSC()
+local function isTooLateForSC(lapsThreshold)
     if not currentSession then return false end
 
     local averageBestLapTime = calculateAverageBestLapTime(currentSession) or 0
@@ -380,8 +380,11 @@ local function isTooLateForSC()
         sessionLength = sessionLength + averageBestLapTime
     end
 
-    local scActiveTime = sessionLength - (averageBestLapTime * 4)
+    local scActiveTime = sessionLength - (averageBestLapTime * lapsThreshold)
     local csTime = sim.sessionTimeLeft * -1
+
+    writeLog("Time check (Min Laps - " .. lapsThreshold .. "): AverageLaptime is - " .. averageBestLapTime .. ", Active Tiem Thresh is - " .. scActiveTime .. ", Session time is " .. csTime )
+
     if csTime > scActiveTime and scActiveTime > 0 then
         return true
     else
@@ -404,8 +407,8 @@ local function callSafetyCar()
         return
     end
 
-    --session time check
-    if isTooLateForSC() then
+    --session time check - parameter is the laps left needed
+    if isTooLateForSC(4) then
         writeLog("WARNING Cannot be called as too late in session")
         return
     end
@@ -430,6 +433,12 @@ end
 local function canSafetyCarComeIn()
 
     writeLog("Call in check")
+
+    --session time check - parameter is the laps left needed 2
+    if isTooLateForSC(2) then
+        writeLog("Safety Car is heading to pits as its too late in the session")
+        return true
+    end
 
     --if we are at the end then call it in whatever
     if sim.timeRaceEnded or sim.leaderLastLap then
