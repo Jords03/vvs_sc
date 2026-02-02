@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.16"
-SCRIPT_VERSION_CODE = 00016
+SCRIPT_VERSION = "0.0.1.17"
+SCRIPT_VERSION_CODE = 00017
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -756,6 +756,7 @@ function script.update(dt)
                     writeLog("SC State Transitioning from " .. scState .. " to onTrackWaitingForCallIn")
                     scState = "onTrackWaitingForCallIn"
                     setSCValues(scOnTrackWaitingForCallInState, true)
+                    sendMessageWithRetry("SC: Leader caught up to safety car")
                 end
             end
 
