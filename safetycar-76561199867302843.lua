@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.17"
-SCRIPT_VERSION_CODE = 00017
+SCRIPT_VERSION = "0.0.1.18"
+SCRIPT_VERSION_CODE = 00018
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -552,8 +552,10 @@ local function checkNoOneNearSF()
 
     for i, car in ac.iterateCars.ordered() do
         if car ~= safetyCar then
-            if trustableSplinePostionsById[car.index] < scTrackPosMin or trustableSplinePostionsById[car.index] > scTrackPosMax then
-                return false
+            if not car.isInPit then
+                if trustableSplinePostionsById[car.index] < scTrackPosMin or trustableSplinePostionsById[car.index] > scTrackPosMax then
+                    return false
+                end
             end
         end
     end
