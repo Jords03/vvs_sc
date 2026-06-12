@@ -1,7 +1,22 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.18"
-SCRIPT_VERSION_CODE = 00018
+SCRIPT_VERSION = "0.0.1.19"
+SCRIPT_VERSION_CODE = 00019
+
+local ovalTrackIDs = {
+    "aa_pocono",
+    "aa_talladega",
+    "rt_daytona-tri-oval",
+    "tmm_lausitzring-layout_oval",
+    "tochigi_racing_ring-circuit_oval",
+    "tochigi_racing_ring-circuit_oval_jgtc",
+    "vrc_southstar-day",
+    "vrc_southstar-night"}
+
+local scRollingSpeed = 100
+local scMaxSpeed = 180
+local scMinSpeed = 30
+local maxLapsOut = 2
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -208,7 +223,7 @@ local scInactiveState = {
 
 local scWaitingToRollingState = {
     autopilotOn = true,
-    scTopSpeed = 100,
+    scTopSpeed = scRollingSpeed,
     pitStopRequest = false,
     lightsOn = true,
     throttleLimit = 0.5,
@@ -217,7 +232,7 @@ local scWaitingToRollingState = {
 
 local scRollingState = {
     autopilotOn = true,
-    scTopSpeed = 100,
+    scTopSpeed = scRollingSpeed,
     pitStopRequest = false,
     lightsOn = true,
     throttleLimit = 0.5,
@@ -226,7 +241,7 @@ local scRollingState = {
 
 local scComingInState = {
     autopilotOn = true,
-    scTopSpeed = 180,
+    scTopSpeed = scMaxSpeed,
     pitStopRequest = true,
     lightsOn = false,
     throttleLimit = 0.5,
@@ -253,7 +268,7 @@ local scCalledLeavingPitsState = {
 
 local scOnTrackWaitingForLeaderState = {
     autopilotOn = true,
-    scTopSpeed = 30,
+    scTopSpeed = scMinSpeed,
     pitStopRequest = false,
     lightsOn = true,
     throttleLimit = 0.5,
@@ -262,7 +277,7 @@ local scOnTrackWaitingForLeaderState = {
 
 local scOnTrackWaitingForCallInState = {
     autopilotOn = true,
-    scTopSpeed = 100,
+    scTopSpeed = scRollingSpeed,
     pitStopRequest = false,
     lightsOn = true,
     throttleLimit = 0.5,
@@ -317,6 +332,18 @@ local function initialize()
     --init SC car control state
     setSCValues(scInactiveState, true)
 
+    --check if this is an oval track
+    local trackID = ac.getTrackFullID("-")
+    writeLog("Track ID is: " .. trackID)
+
+    if tableContains(ovalTrackIDs,trackID) then
+        writeLog("Track is an oval - using oval values")
+        scRollingSpeed = 160
+        scMinSpeed = 100
+        maxLapsOut = 5
+        scMaxSpeed = 200
+    end
+
     -- Set track length dependent thresholds
     local trackLength = sim.trackLengthM
     if trackLength >= 3500 then
@@ -344,48 +371,28 @@ end
 
 
 -- For deciding if race is near complete
--- Calculates the average best lap time of up to three drivers on the leaderboard.
-local function calculateAverageBestLapTime(session)
-    if not (session and session.leaderboard and #session.leaderboard > 0) then
-        writeLog("No drivers in the leaderboard to calculate the average.")
-        return nil
-    end
-
-    local totalBestLapTimeMs = 0
-    local driverCount = math.min(3, #session.leaderboard)
-
-    for i = 0, driverCount - 1 do
-        local entry = session.leaderboard[i]
-        totalBestLapTimeMs = totalBestLapTimeMs + entry.bestLapTimeMs
-    end
-
-    local averageBestLapTimeMs = totalBestLapTimeMs / driverCount
-    return averageBestLapTimeMs
-end
-
--- For deciding if race is near complete
 -- Calculates the session length and the time the SC should be active for
 local function isTooLateForSC(lapsThreshold)
-    if not currentSession then return false end
-
-    local averageBestLapTime = calculateAverageBestLapTime(currentSession) or 0
-    local sessionLength = 0
-
-    if currentSession.isTimedRace then
-        sessionLength = currentSession.durationMinutes * 60000
-    else
-        sessionLength = currentSession.laps * averageBestLapTime
-    end
-    if currentSession.hasAdditionalLap then
-        sessionLength = sessionLength + averageBestLapTime
+    if not currentSession then
+        writeLog("Too late check - session is null!!!!")
+        return false
     end
 
-    local scActiveTime = sessionLength - (averageBestLapTime * lapsThreshold)
-    local csTime = sim.sessionTimeLeft * -1
+    local bestLapTime = sim.bestLapTimeMs
+    writeLog("Time check - best lap time is: " .. bestLapTime)
 
-    writeLog("Time check (Min Laps - " .. lapsThreshold .. "): AverageLaptime is - " .. averageBestLapTime .. ", Active Tiem Thresh is - " .. scActiveTime .. ", Session time is " .. csTime )
+    local scActiveTime = bestLapTime * lapsThreshold
+    local sessionTimeLeft = sim.sessionTimeLeft
 
-    if csTime > scActiveTime and scActiveTime > 0 then
+    writeLog("Time check (Min Laps: " .. lapsThreshold .. "): BestLaptime is: " .. bestLapTime .. ", Active Time Thresh is: " .. scActiveTime .. ", Session time left is: " .. sessionTimeLeft )
+
+    --if sessionTimeLeft is negative then we are in overtime so it's definitely too late
+    if sessionTimeLeft < 0 then
+        return true
+    end
+
+    --if sessionTimeLeft is less than the active time then we are too late
+    if sessionTimeLeft < scActiveTime then
         return true
     else
         return false
@@ -446,8 +453,8 @@ local function canSafetyCarComeIn()
         return true
     end
 
-    --if the SC has done more than 2 laps then call it in
-    if safetyCar.lapCount - scLapCountWhenCalledOut >= 2 then
+    --if the SC has done more than maxLapsOut laps then call it in
+    if safetyCar.lapCount - scLapCountWhenCalledOut >= maxLapsOut then
         writeLog("Safety Car is heading to pits as its been out for too many laps")
         return true
     end
