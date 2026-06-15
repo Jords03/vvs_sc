@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.19"
-SCRIPT_VERSION_CODE = 00019
+SCRIPT_VERSION = "0.0.1.20"
+SCRIPT_VERSION_CODE = 00020
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -342,6 +342,71 @@ local function initialize()
         scMinSpeed = 100
         maxLapsOut = 5
         scMaxSpeed = 200
+
+        scWaitingToRollingState = {
+            autopilotOn = true,
+            scTopSpeed = scRollingSpeed,
+            pitStopRequest = false,
+            lightsOn = true,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+        scRollingState = {
+            autopilotOn = true,
+            scTopSpeed = scRollingSpeed,
+            pitStopRequest = false,
+            lightsOn = true,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+        scComingInState = {
+            autopilotOn = true,
+            scTopSpeed = scMaxSpeed,
+            pitStopRequest = true,
+            lightsOn = false,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+        scBackToPitLaneState = {
+            autopilotOn = true,
+            scTopSpeed = 25,
+            pitStopRequest = true,
+            lightsOn = false,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+        scCalledLeavingPitsState = {
+            autopilotOn = true,
+            scTopSpeed = 60,
+            pitStopRequest = false,
+            lightsOn = true,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+        scOnTrackWaitingForLeaderState = {
+            autopilotOn = true,
+            scTopSpeed = scMinSpeed,
+            pitStopRequest = false,
+            lightsOn = true,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+        scOnTrackWaitingForCallInState = {
+            autopilotOn = true,
+            scTopSpeed = scRollingSpeed,
+            pitStopRequest = false,
+            lightsOn = true,
+            throttleLimit = 0.5,
+            aggression = 0.8
+        }
+
+
     end
 
     -- Set track length dependent thresholds
