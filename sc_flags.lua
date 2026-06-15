@@ -1,11 +1,22 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.14"
-SCRIPT_VERSION_CODE = 00014
+SCRIPT_VERSION = "0.0.1.15"
+SCRIPT_VERSION_CODE = 00015
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
 --####################################################################################################
+
+local ovalTrackIDs = {
+    "aa_pocono",
+    "aa_talladega",
+    "rt_daytona-tri-oval",
+    "tmm_lausitzring-layout_oval",
+    "tochigi_racing_ring-circuit_oval",
+    "tochigi_racing_ring-circuit_oval_jgtc",
+    "vrc_southstar-day",
+    "vrc_southstar-night"}
+
 
 --CONSTANTS
 local adminCarNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
@@ -593,6 +604,15 @@ local function initialize()
 
     --fetch the admin and safety cars
     getAdminAndSafetyCars()
+
+    --check if this is an oval track
+    local trackID = ac.getTrackFullID("-")
+    writeLog("SC Flags: Track ID is: " .. trackID)
+
+    if tableContains(ovalTrackIDs,trackID) then
+        writeLog("SC Flags: Track is an oval - using oval values")
+        speedLimit = 160
+    end
 
     writeLog("SC Flags: Initialization finished - sending notification messages.")
     if (driverCar ==nil) then
