@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.22"
-SCRIPT_VERSION_CODE = 00022
+SCRIPT_VERSION = "0.0.1.24"
+SCRIPT_VERSION_CODE = 00024
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -346,15 +346,15 @@ local function initialize()
     writeLog("Track ID is: " .. trackID)
 
     if tableContains(ovalTrackIDs,trackID) then
-        writeLog("Track is an oval - using oval values")
+        writeLog("Track is an oval - overriding using oval values")
         scRollingSpeed = 160
         scMinSpeed = 100
         maxLapsOut = 5
         scMaxSpeed = 200
         isOval = true
 
-        SC_CALLIN_THRESHOLD_START = 0.25
-        SC_CALLIN_THRESHOLD_END = 0.5
+        SC_CALLIN_THRESHOLD_START = 0.35
+        SC_CALLIN_THRESHOLD_END = 0.65
 
         -- Set track length dependent thresholds
         --local trackLength = sim.trackLengthM
@@ -553,6 +553,12 @@ local function canSafetyCarComeIn()
             --10KMH check
             if car.speedKmh <= 10 then
                 writeLog(car:driverName() .. " is too slow to be counted (under 10KMH)")
+                if isOval then
+                    if safetyCar.lapCount == scLapCountWhenCalledOut then
+                        writeLog("This is an Oval race, SC is on first lap out, and car is too slow - SC cannot come in")
+                        return false
+                    end
+                end
             else
                 --pitlane check
                 if car.isInPitlane or car.isInPit then
