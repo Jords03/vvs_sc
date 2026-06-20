@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.20"
-SCRIPT_VERSION_CODE = 00020
+SCRIPT_VERSION = "0.0.1.21"
+SCRIPT_VERSION_CODE = 00021
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -17,6 +17,7 @@ local scRollingSpeed = 100
 local scMaxSpeed = 180
 local scMinSpeed = 30
 local maxLapsOut = 2
+local isOval = false
 
 local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
 local safetyCarName = "Safety Car"
@@ -332,6 +333,14 @@ local function initialize()
     --init SC car control state
     setSCValues(scInactiveState, true)
 
+    -- Set track length dependent thresholds
+    local trackLength = sim.trackLengthM
+    if trackLength >= 3500 then
+        SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
+        SC_CALLIN_THRESHOLD_END = 1 - (750 / trackLength)
+        writeLog("Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
+    end
+
     --check if this is an oval track
     local trackID = ac.getTrackFullID("-")
     writeLog("Track ID is: " .. trackID)
@@ -342,6 +351,18 @@ local function initialize()
         scMinSpeed = 100
         maxLapsOut = 5
         scMaxSpeed = 200
+        isOval = true
+
+        SC_CALLIN_THRESHOLD_START = 0.25
+        SC_CALLIN_THRESHOLD_END = 0.5
+
+        -- Set track length dependent thresholds
+        local trackLength = sim.trackLengthM
+        if trackLength >= 3500 then
+            SC_CALLIN_THRESHOLD_START = 1 - (2575 / trackLength)
+            SC_CALLIN_THRESHOLD_END = 1 - (1575 / trackLength)
+            writeLog("Oval override Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
+        end
 
         scWaitingToRollingState = {
             autopilotOn = true,
@@ -409,13 +430,7 @@ local function initialize()
 
     end
 
-    -- Set track length dependent thresholds
-    local trackLength = sim.trackLengthM
-    if trackLength >= 3500 then
-        SC_CALLIN_THRESHOLD_START = 1 - (1750 / trackLength)
-        SC_CALLIN_THRESHOLD_END = 1 - (750 / trackLength)
-        writeLog("Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
-    end
+    
 
     --log out session duration
     if currentSession then    
@@ -542,6 +557,12 @@ local function canSafetyCarComeIn()
                 --pitlane check
                 if car.isInPitlane or car.isInPit then
                     writeLog(car:driverName() .. " is in pitlane")
+                    if isOval then
+                        if safetyCar.lapCount == scLapCountWhenCalledOut then
+                            writeLog("This is an Oval race, SC is on first lap out, and car is in pits - SC cannot come in")
+                            return false
+                        end
+                    end
                 else
                     --retired check
                     if car.isRetired then
