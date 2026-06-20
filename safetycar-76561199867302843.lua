@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.21"
-SCRIPT_VERSION_CODE = 00021
+SCRIPT_VERSION = "0.0.1.22"
+SCRIPT_VERSION_CODE = 00022
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -357,12 +357,12 @@ local function initialize()
         SC_CALLIN_THRESHOLD_END = 0.5
 
         -- Set track length dependent thresholds
-        local trackLength = sim.trackLengthM
-        if trackLength >= 3500 then
-            SC_CALLIN_THRESHOLD_START = 1 - (2575 / trackLength)
-            SC_CALLIN_THRESHOLD_END = 1 - (1575 / trackLength)
-            writeLog("Oval override Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
-        end
+        --local trackLength = sim.trackLengthM
+        --if trackLength >= 3500 then
+        --    SC_CALLIN_THRESHOLD_START = 1 - (2575 / trackLength)
+        --    SC_CALLIN_THRESHOLD_END = 1 - (1575 / trackLength)
+        --    writeLog("Oval override Longer track (" .. tostring(trackLength) .. "), thresholds set to - start: " .. tostring(SC_CALLIN_THRESHOLD_START) .. " | end: " .. tostring(SC_CALLIN_THRESHOLD_END))
+        --end
 
         scWaitingToRollingState = {
             autopilotOn = true,
