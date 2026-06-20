@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.24"
-SCRIPT_VERSION_CODE = 00024
+SCRIPT_VERSION = "0.0.1.25"
+SCRIPT_VERSION_CODE = 00025
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -353,8 +353,8 @@ local function initialize()
         scMaxSpeed = 200
         isOval = true
 
-        SC_CALLIN_THRESHOLD_START = 0.35
-        SC_CALLIN_THRESHOLD_END = 0.65
+        SC_CALLIN_THRESHOLD_START = 0.3
+        SC_CALLIN_THRESHOLD_END = 0.4
 
         -- Set track length dependent thresholds
         --local trackLength = sim.trackLengthM
