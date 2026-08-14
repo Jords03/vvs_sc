@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.25"
-SCRIPT_VERSION_CODE = 00025
+SCRIPT_VERSION = "0.0.1.26"
+SCRIPT_VERSION_CODE = 00026
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -652,8 +652,10 @@ local function checkNoOneNearSF()
     for i, car in ac.iterateCars.ordered() do
         if car ~= safetyCar then
             if not car.isInPit then
-                if trustableSplinePostionsById[car.index] < scTrackPosMin or trustableSplinePostionsById[car.index] > scTrackPosMax then
-                    return false
+                if not car.isInPitlane then
+                    if trustableSplinePostionsById[car.index] < scTrackPosMin or trustableSplinePostionsById[car.index] > scTrackPosMax then
+                        return false
+                    end
                 end
             end
         end
