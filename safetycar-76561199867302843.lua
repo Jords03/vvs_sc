@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.26"
-SCRIPT_VERSION_CODE = 00026
+SCRIPT_VERSION = "0.0.1.27"
+SCRIPT_VERSION_CODE = 00027
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -603,7 +603,8 @@ end
 
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
-    if senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) then
+    --Chat msg received: (dom) Doms broadcast chat | Car ID: -1 | Session ID: 255
+    if senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) or -1 then
         if message == "SC scon" then
             writeLog("SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
             callSafetyCar()
@@ -634,6 +635,19 @@ end
 
 --triggered when a message is received
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
+    --Chat msg received: (dom) Doms broadcast chat | Car ID: -1 | Session ID: 255
+    if string.startsWith(message, "(dom) ") then
+        writeLog("Server Chat msg received from Dom: " .. message .. " | Car ID: " .. senderCarIndex)
+        message = string.sub(message,7)
+        writeLog("Server Chat msg stripped to: " .. message)
+    end
+
+    if string.startsWith(message, "(nigel) ") then
+        writeLog("Server Chat msg received from Nigel: " .. message .. " | Car ID: " .. senderCarIndex)
+        message = string.sub(message,9)
+        writeLog("Server Chat msg stripped to: " .. message)
+    end
+
     if string.startsWith(message, "SC") then
         writeLog("Chat msg received: " .. message .. " | Car ID: " .. senderCarIndex)
         return processChatMessage(message, senderCarIndex)
