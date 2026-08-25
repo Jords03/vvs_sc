@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.16"
-SCRIPT_VERSION_CODE = 00016
+SCRIPT_VERSION = "0.0.1.17"
+SCRIPT_VERSION_CODE = 00017
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -671,7 +671,7 @@ ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
 
         if safetyCar then
             writeLog("Chatmsg received: " .. message)
-            if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) or -1) then
+            if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) or senderCarIndex == -1) then
                 --rolling start invoked
                 if message == "SC: Safety Car rolling start" then
                     writeLog("SC Flags: Recieved - Safety Car rolling start")
