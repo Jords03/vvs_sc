@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.27"
-SCRIPT_VERSION_CODE = 00027
+SCRIPT_VERSION = "0.0.1.28"
+SCRIPT_VERSION_CODE = 00028
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -604,7 +604,7 @@ end
 -- Listen to chat messages calling SC deployment or manual SC control
 local function processChatMessage(message, senderCarIndex)
     --Chat msg received: (dom) Doms broadcast chat | Car ID: -1 | Session ID: 255
-    if senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) or -1 then
+    if senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) or senderCarIndex == -1 then
         if message == "SC scon" then
             writeLog("SC scon received | " .. "CarID: " .. senderCarIndex .. " | Name: " .. ac.getCar(senderCarIndex):driverName())
             callSafetyCar()
