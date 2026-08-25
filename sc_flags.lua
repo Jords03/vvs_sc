@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.15"
-SCRIPT_VERSION_CODE = 00015
+SCRIPT_VERSION = "0.0.1.16"
+SCRIPT_VERSION_CODE = 00016
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -651,13 +651,27 @@ initialize()
 
 --chat message processing - will cause various state transitions
 ac.onChatMessage(function(message, senderCarIndex, senderSessionID)
+
+    --Chat msg received: (dom) Doms broadcast chat | Car ID: -1 | Session ID: 255
+    if string.startsWith(message, "(dom) ") then
+        writeLog("Server Chat msg received from Dom: " .. message .. " | Car ID: " .. senderCarIndex)
+        message = string.sub(message,7)
+        writeLog("Server Chat msg stripped to: " .. message)
+    end
+
+    if string.startsWith(message, "(nigel) ") then
+        writeLog("Server Chat msg received from Nigel: " .. message .. " | Car ID: " .. senderCarIndex)
+        message = string.sub(message,9)
+        writeLog("Server Chat msg stripped to: " .. message)
+    end
+
     if string.startsWith(message, "SC") then
         --refresh the admin and safety car details
         getAdminAndSafetyCars()
 
         if safetyCar then
             writeLog("Chatmsg received: " .. message)
-            if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex))) then
+            if (senderCarIndex == safetyCar.index or (adminCars and tableContains(adminCars,senderCarIndex)) or -1) then
                 --rolling start invoked
                 if message == "SC: Safety Car rolling start" then
                     writeLog("SC Flags: Recieved - Safety Car rolling start")
