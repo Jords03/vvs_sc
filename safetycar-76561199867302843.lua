@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Mark2"
 SCRIPT_SHORT_NAME = "VVSSC2"
-SCRIPT_VERSION = "0.0.1.28"
-SCRIPT_VERSION_CODE = 00028
+SCRIPT_VERSION = "0.0.1.29"
+SCRIPT_VERSION_CODE = 00029
 
 local ovalTrackIDs = {
     "aa_pocono",
@@ -19,7 +19,7 @@ local scMinSpeed = 30
 local maxLapsOut = 2
 local isOval = false
 
-local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters"}
+local adminNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters", "Rich Snape"}
 local safetyCarName = "Safety Car"
 --for local testing by Nigel
 --local adminNames = {"Jon Astrop", "Dominic Fovargue"}
