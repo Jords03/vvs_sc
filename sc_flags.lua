@@ -1,7 +1,7 @@
 SCRIPT_NAME = "VVS Safety Car Flags Mark2"
 SCRIPT_SHORT_NAME = "VVSSCFLAGS2"
-SCRIPT_VERSION = "0.0.1.18"
-SCRIPT_VERSION_CODE = 00018
+SCRIPT_VERSION = "0.0.1.19"
+SCRIPT_VERSION_CODE = 00019
 
 --####################################################################################################
 --####################################### GLOBALS ####################################################
@@ -19,7 +19,7 @@ local ovalTrackIDs = {
 
 
 --CONSTANTS
-local adminCarNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters", "Rich Snape"}
+local adminCarNames = {"Jon Astrop", "Dominic Fovargue", "Nigel Walters", "Rich Snape", "Jimmy Lindo", "Martijn Mol"}
 local safetyCarName = "Safety Car"
 --distance you should be within when following
 local distanceThreshold = 16
